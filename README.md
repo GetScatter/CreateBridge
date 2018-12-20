@@ -6,7 +6,7 @@ If you are an app you can send the `createbridge` contract funds with your `orig
 will be used to pay for 1/2 of the user's account's RAM.
 
 Example:
-- `cleos transfer YOUR_ACCOUNT createbridge "10.0000 EOS" "everipedia.org" -p YOUR_ACCOUNT`
+- `cleos transfer YOUR_ACCOUNT createbridge "10.0000 EOS" "everipedia.org"`
 
 Because of the way this contract works, anyone can help fund account creation for your app by simply sending amounts
 to the contract with your app's origin inside of the memo.
