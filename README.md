@@ -7,16 +7,18 @@ If you are an app you can send the `createbridge` contract funds with your `orig
 will be used to pay for 1/2 of the user's account's RAM.
 
 
-
 ### Partial Costs
+
 You can assume just 50% of the RAM costs for an account.
 - `cleos transfer YOUR_ACCOUNT createbridge "10.0000 EOS" "everipedia.org"`
 
 ### Full Costs
+
 You can also opt to create entirely free accounts by adding a `::free` suffix to your `origin`
 - `cleos transfer YOUR_ACCOUNT createbridge "10.0000 EOS" "everipedia.org::free"`
 
 ### Globally Crowd-Free Accounts
+
 Anyone can send EOS to this contract with the memo `free` to help fund completely free accounts for new EOS users.
 - `cleos transfer YOUR_ACCOUNT createbridge "10.0000 EOS" "free"`
 
