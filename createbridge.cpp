@@ -16,6 +16,19 @@ public:
     using contract::contract;
     createbridge(name receiver, name code,  datastream<const char*> ds):contract(receiver, code, ds) {}
 
+    template <typename T>
+    void cleanTable(){
+        T db(_self, _self.value);
+        while(db.begin() != db.end()){
+            auto itr = --db.end();
+            db.erase(itr);
+        }
+    }
+
+    ACTION clean(){
+        require_auth(_self);
+        cleanTable<Balances>();
+    }
 
 
     /**********************************************/
@@ -27,25 +40,53 @@ public:
     ACTION create(string& memo, name& account, public_key& key, string& origin){
         require_auth(_self);
 
-
-
-        RamInfo ramInfo(name("eosio"), name("eosio").value);
-        auto ramData = ramInfo.find(S_RAM.raw());
-        eosio_assert(ramData != ramInfo.end(), "Could not get RAM info");
-
-        uint64_t base = ramData->base.balance.amount;
-        uint64_t quote = ramData->quote.balance.amount;
-        asset baseRamCost = asset((((double)quote / base))*4096, S_EOS);
-
         key_weight k = key_weight{key, 1};
-
         authority auth{
-            .threshold = 1,
-            .keys = {k},
-            .accounts = {},
-            .waits = {}
+                .threshold = 1,
+                .keys = {k},
+                .accounts = {},
+                .waits = {}
         };
 
+        asset ram = getRamCost();
+        asset minimumCost = ram + asset(0'5000, S_EOS);
+
+        string freeId = "free";
+        string originFreeId = origin+"::free";
+
+        if(hasBalance(originFreeId, minimumCost)) createFreeAccount(memo, account, auth, ram, originFreeId);
+        else if(hasBalance(freeId, minimumCost))  createFreeAccount(memo, account, auth, ram, freeId);
+        else                                      createJointAccount(memo, account, origin, auth, ram);
+    }
+
+
+
+    /**********************************************/
+    /***                                        ***/
+    /***                Helpers                 ***/
+    /***                                        ***/
+    /**********************************************/
+
+    void createFreeAccount(string& memo, name& account, authority& auth, asset& ram, string& id){
+        asset cpu(0'4000, S_EOS);
+        asset net(0'1000, S_EOS);
+        createAccount(account, auth, ram, net, cpu);
+
+        subBalance(id, ram + asset(0'5000, S_EOS));
+
+        if(hasBalance(memo, asset(0'0000, S_EOS))) {
+            asset remainder = balanceFor(memo);
+            action(
+                    permission_level{ _self, "active"_n },
+                    name("eosio.token"),
+                    name("transfer"),
+                    make_tuple(_self, account, remainder, memo)
+            ).send();
+            subBalance(memo, remainder);
+        }
+    }
+
+    void createJointAccount(string& memo, name& account, string& origin, authority& auth, asset& ram){
         Balances balances(_self, _self.value);
 
         uint64_t payerId = toUUID(memo);
@@ -53,54 +94,88 @@ public:
         eosio_assert(payer != balances.end(), "Could not find balance");
         asset fromPayer = payer->balance;
 
-        asset ramFromPayer = baseRamCost;
+        asset ramFromPayer = ram;
         asset ramFromDapp = asset(0'0000, S_EOS);
-        uint64_t originId = toUUID(origin);
-        auto dapp = balances.find(originId);
 
-        if(dapp != balances.end()){
-            ramFromDapp.amount = baseRamCost.amount/2;
-            ramFromPayer -= ramFromDapp;
+        if(hasBalance(origin, ram)){
+            uint64_t originId = toUUID(origin);
+            auto dapp = balances.find(originId);
+
+            if(dapp != balances.end()){
+                ramFromDapp.amount = ram.amount/2;
+                ramFromPayer -= ramFromDapp;
+            }
         }
 
         asset leftover = fromPayer - ramFromPayer;
         asset cpu(((float)leftover.amount * 0.8), S_EOS);
         asset net(((float)leftover.amount * 0.2), S_EOS);
 
-        newaccount new_account = newaccount{
-                .creator = _self,
-                .name = account,
-                .owner = auth,
-                .active = auth
-        };
+        if(!hasBalance(memo, ram + cpu + net)){
+            eosio_assert(false, "Not enough to pay for account.");
+        }
 
-        action(
-                permission_level{ _self, "active"_n },
-                name("eosio"),
-                name("newaccount"),
-                new_account
-        ).send();
-
-        action(
-                permission_level{ _self, "active"_n },
-                name("eosio"),
-                name("buyram"),
-                make_tuple(_self, account, baseRamCost)
-        ).send();
-
-        action(
-                permission_level{ _self, "active"_n },
-                name("eosio"),
-                name("delegatebw"),
-                make_tuple(_self, account, net, cpu, true)
-        ).send();
+        createAccount(account, auth, ram, net, cpu);
 
         subBalance(memo, fromPayer);
         if(ramFromDapp.amount > 0){
             subBalance(origin, ramFromDapp);
         }
-
     }
+
+    /***
+     * Gets the current RAM cost in EOS for 4096 bytes of RAM.
+     * @return
+     */
+    asset getRamCost(){
+        RamInfo ramInfo(name("eosio"), name("eosio").value);
+        auto ramData = ramInfo.find(S_RAM.raw());
+        eosio_assert(ramData != ramInfo.end(), "Could not get RAM info");
+
+        uint64_t base = ramData->base.balance.amount;
+        uint64_t quote = ramData->quote.balance.amount;
+        return asset((((double)quote / base))*4096, S_EOS);
+    }
+
+    /***
+     * Creates an account based on passed in values
+     */
+    void createAccount(name& account, authority& auth, asset& ram, asset& net, asset& cpu){
+        newaccount new_account = newaccount{
+            .creator = _self,
+            .name = account,
+            .owner = auth,
+            .active = auth
+        };
+
+        action(
+            permission_level{ _self, "active"_n },
+            name("eosio"),
+            name("newaccount"),
+            new_account
+        ).send();
+
+        action(
+            permission_level{ _self, "active"_n },
+            name("eosio"),
+            name("buyram"),
+            make_tuple(_self, account, ram)
+        ).send();
+
+        action(
+            permission_level{ _self, "active"_n },
+            name("eosio"),
+            name("delegatebw"),
+            make_tuple(_self, account, net, cpu, true)
+        ).send();
+    }
+
+
+
+
+
+
+
 
     /**********************************************/
     /***                                        ***/
@@ -108,13 +183,17 @@ public:
     /***                                        ***/
     /**********************************************/
 
-    void hasBalance(string& memo, const asset& quantity){
-        uint64_t id = toUUID(memo);
-
+    asset balanceFor(string& memo){
         Balances balances(_self, _self.value);
-        auto iterator = balances.find(id);
-        eosio_assert(iterator != balances.end(), "Could not find balance");
-        eosio_assert(iterator->balance.amount >= quantity.amount, "Not enough tokens.");
+        uint64_t payerId = toUUID(memo);
+        auto payer = balances.find(payerId);
+        if(payer == balances.end()) return asset(0'0000, S_EOS);
+        return payer->balance;
+    }
+
+    bool hasBalance(string memo, const asset& quantity){
+//        return false;
+        return balanceFor(memo).amount > quantity.amount;
     }
 
     void addBalance(const asset& quantity, string& memo){
@@ -125,6 +204,7 @@ public:
         if(iterator == balances.end()) balances.emplace(_self, [&](auto& row){
             row.memo = id;
             row.balance = quantity;
+            row.origin = memo;
         });
         else balances.modify(iterator, same_payer, [&](auto& row){
             row.balance += quantity;
@@ -147,6 +227,9 @@ public:
         else balances.modify(iterator, same_payer, [&](auto& row){
             row.balance -= quantity;
         });
+
+//        print("Memo?: ", memo.c_str(), " ");
+//        eosio_assert(false, "nothing");
     }
 
     /**********************************************/
@@ -169,7 +252,7 @@ void apply(uint64_t receiver, uint64_t code, uint64_t action) {
     auto self = receiver;
 
     if( code == self ) switch(action) {
-        EOSIO_DISPATCH_HELPER( createbridge, (create) )
+        EOSIO_DISPATCH_HELPER( createbridge, (clean)(create) )
     }
 
     else {

@@ -12,7 +12,7 @@ namespace common {
     static const symbol S_EOS = symbol("SYS", 4);
     static const symbol S_RAM = symbol("RAMCORE", 4);
 
-    inline static uint64_t toUUID(string& username){
+    inline static uint64_t toUUID(string username){
         return std::hash<string>{}(username);
     }
 
