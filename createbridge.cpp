@@ -37,6 +37,7 @@ public:
     /***                                        ***/
     /**********************************************/
 
+
     ACTION create(string& memo, name& account, public_key& key, string& origin){
         require_auth(_self);
 
@@ -49,7 +50,7 @@ public:
         };
 
         asset ram = getRamCost();
-        asset minimumCost = ram + asset(0'5000, S_EOS);
+        asset minimumCost = ram + asset(0'5000, S_SYS);
 
         string freeId = "free";
         string originFreeId = origin+"::free";
@@ -68,13 +69,13 @@ public:
     /**********************************************/
 
     void createFreeAccount(string& memo, name& account, authority& auth, asset& ram, string& id){
-        asset cpu(0'4000, S_EOS);
-        asset net(0'1000, S_EOS);
+        asset cpu(0'4000, S_SYS);
+        asset net(0'1000, S_SYS);
         createAccount(account, auth, ram, net, cpu);
 
-        subBalance(id, ram + asset(0'5000, S_EOS));
+        subBalance(id, ram + asset(0'5000, S_SYS));
 
-        if(hasBalance(memo, asset(0'0000, S_EOS))) {
+        if(hasBalance(memo, asset(0'0000, S_SYS))) {
             asset remainder = balanceFor(memo);
             action(
                     permission_level{ _self, "active"_n },
@@ -95,7 +96,7 @@ public:
         asset fromPayer = payer->balance;
 
         asset ramFromPayer = ram;
-        asset ramFromDapp = asset(0'0000, S_EOS);
+        asset ramFromDapp = asset(0'0000, S_SYS);
 
         if(hasBalance(origin, ram)){
             uint64_t originId = toUUID(origin);
@@ -108,8 +109,8 @@ public:
         }
 
         asset leftover = fromPayer - ramFromPayer;
-        asset cpu(((float)leftover.amount * 0.8), S_EOS);
-        asset net(((float)leftover.amount * 0.2), S_EOS);
+        asset cpu(((float)leftover.amount * 0.8), S_SYS);
+        asset net(((float)leftover.amount * 0.2), S_SYS);
 
         if(!hasBalance(memo, ram + cpu + net)){
             eosio_assert(false, "Not enough to pay for account.");
@@ -134,7 +135,7 @@ public:
 
         uint64_t base = ramData->base.balance.amount;
         uint64_t quote = ramData->quote.balance.amount;
-        return asset((((double)quote / base))*4096, S_EOS);
+        return asset((((double)quote / base))*4096, S_SYS);
     }
 
     /***
@@ -187,7 +188,7 @@ public:
         Balances balances(_self, _self.value);
         uint64_t payerId = toUUID(memo);
         auto payer = balances.find(payerId);
-        if(payer == balances.end()) return asset(0'0000, S_EOS);
+        if(payer == balances.end()) return asset(0'0000, S_SYS);
         return payer->balance;
     }
 
@@ -205,9 +206,11 @@ public:
             row.memo = id;
             row.balance = quantity;
             row.origin = memo;
+            row.timestamp = now();
         });
         else balances.modify(iterator, same_payer, [&](auto& row){
             row.balance += quantity;
+            row.timestamp = now();
         });
     }
 
@@ -241,7 +244,7 @@ public:
     void transfer(const name& from, const name& to, const asset& quantity, string& memo){
         if(to != _self) return;
         if(from == name("eosio.stake")) return;
-        if(quantity.symbol != S_EOS) return;
+        if(quantity.symbol != S_SYS) return;
         addBalance(quantity, memo);
     }
 

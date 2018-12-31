@@ -6,6 +6,7 @@ namespace balances {
         uint64_t memo;
         asset balance;
         string origin;
+        uint64_t timestamp;
 
         uint64_t primary_key() const { return memo; }
     };
