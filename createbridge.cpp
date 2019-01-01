@@ -193,7 +193,6 @@ public:
     }
 
     bool hasBalance(string memo, const asset& quantity){
-//        return false;
         return balanceFor(memo).amount > quantity.amount;
     }
 
