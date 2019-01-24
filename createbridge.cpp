@@ -229,9 +229,6 @@ public:
         else balances.modify(iterator, same_payer, [&](auto& row){
             row.balance -= quantity;
         });
-
-//        print("Memo?: ", memo.c_str(), " ");
-//        eosio_assert(false, "nothing");
     }
 
     /**********************************************/
@@ -244,6 +241,7 @@ public:
         if(to != _self) return;
         if(from == name("eosio.stake")) return;
         if(quantity.symbol != S_SYS) return;
+        if(memo.length() > 64) return;
         addBalance(quantity, memo);
     }
 
