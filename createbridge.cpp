@@ -98,7 +98,7 @@ public:
         asset ramFromPayer = ram;
         asset ramFromDapp = asset(0'0000, S_SYS);
 
-        if(hasBalance(origin, ram)){
+        if(memo != origin && hasBalance(origin, ram)){
             uint64_t originId = toUUID(origin);
             auto dapp = balances.find(originId);
 
@@ -262,7 +262,5 @@ void apply(uint64_t receiver, uint64_t code, uint64_t action) {
             execute_action(name(receiver), name(code), &createbridge::transfer);
         }
     }
-
-
 }
 };
