@@ -2,9 +2,25 @@
 
 This is an EOSIO account creator contract that allows apps to assume portions of the costs for account creation.
 
-
 If you are an app you can send the `createbridge` contract funds with your `origin` as the memo to allocate some funds which
 will be used to pay for 1/2 of the user's account's RAM.
+
+### Quick Start
+
+Deploy the contract
+- `. set.sh`
+
+Set the permissions
+- `. perms.sh`
+
+Transfer some funds
+- `cleos transfer oreoreoreore oreorebridge "10.0000 EOS" "oreoreoreore"`
+
+Check the balance(s)
+- `. tables.sh`
+
+Create a new account
+- `. create.sh`
 
 
 ### Partial Costs
@@ -21,7 +37,6 @@ You can also opt to create entirely free accounts by adding a `::free` suffix to
 
 Anyone can send EOS to this contract with the memo `free` to help fund completely free accounts for new EOS users.
 - `cleos transfer YOUR_ACCOUNT createbridge "10.0000 EOS" "free"`
-
 
 
 ## Everyone can help!
