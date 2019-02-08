@@ -2,7 +2,7 @@
 
 echo "-------------------"
 echo "Balances"
-cleoskylin get table oreorebridge oreorebridge balances
+cleos get table createbridge createbridge balances
 echo ""
 echo ""
 
