@@ -38,6 +38,41 @@ public:
     /**********************************************/
 
 
+    // Called to claim an account name as the owner of a dapp. 
+    // Only the owner account/whitelisted account will be able to create new user account for the dapp 
+    ACTION claim(name& owner, string dapp, asset ram, asset net, asset cpu, bool buy) {
+        require_auth(owner);
+        Dappregistry dapps(_self, _self.value);
+        auto iterator = dapps.find(toUUID(dapp));
+        if(iterator == dapps.end())dapps.emplace(_self, [&](auto& row){
+            row.owner = owner;
+            row.dapp = dapp;
+            row.ram = ram;
+            row.net = net;
+            row.cpu = cpu;
+            row.buy = buy;
+        }); else {
+            auto msg = "the dapp " + dapp + " is already registered by another account";
+            eosio_assert(false, msg.c_str());
+        }
+    }
+
+    // lets the owner account of the dapp to whitelist other accounts. 
+    ACTION whitelist(name owner, name account, string dapp){
+        require_auth(owner);
+
+        Dappregistry dapps(_self, _self.value);
+        auto iterator = dapps.find(toUUID(dapp));
+
+        if(iterator != dapps.end() && owner == iterator->owner)dapps.modify(iterator, same_payer, [&](auto& row){
+            row.whitelisted_accounts.push_back(account);
+        }); else {
+            auto msg = "the dapp " + dapp + " is not owned by account " + owner.to_string();
+            eosio_assert(false, msg.c_str());
+        }
+
+    }
+
     ACTION create(string& memo, name& account, public_key& key, string& origin){
         require_auth(_self);
 
@@ -249,7 +284,7 @@ void apply(uint64_t receiver, uint64_t code, uint64_t action) {
     auto self = receiver;
 
     if( code == self ) switch(action) {
-        EOSIO_DISPATCH_HELPER( createbridge, (clean)(create) )
+        EOSIO_DISPATCH_HELPER( createbridge, (clean)(create)(claim)(whitelist) )
     }
 
     else {
