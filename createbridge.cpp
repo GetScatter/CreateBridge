@@ -69,9 +69,7 @@ public:
     /**********************************************/
 
     void createFreeAccount(string& memo, name& account, authority& auth, asset& ram, string& id){
-        asset cpu(0'4000, S_SYS);
-        asset net(0'1000, S_SYS);
-        createAccount(account, auth, ram, net, cpu);
+        createAccount(account, auth, ram, NET, CPU);
 
         subBalance(id, ram + asset(0'5000, S_SYS));
 
@@ -108,17 +106,16 @@ public:
             }
         }
 
-        asset leftover = fromPayer - ramFromPayer;
-        asset cpu(((float)leftover.amount * 0.8), S_SYS);
-        asset net(((float)leftover.amount * 0.2), S_SYS);
+        asset requiredBalance = ramFromPayer + CPU + NET;
 
-        if(!hasBalance(memo, ram + cpu + net)){
+        if(!hasBalance(memo, requiredBalance)){
             eosio_assert(false, "Not enough to pay for account.");
         }
 
-        createAccount(account, auth, ram, net, cpu);
+        createAccount(account, auth, ram, NET, CPU);
 
-        subBalance(memo, fromPayer);
+        subBalance(memo, requiredBalance);
+
         if(ramFromDapp.amount > 0){
             subBalance(origin, ramFromDapp);
         }
