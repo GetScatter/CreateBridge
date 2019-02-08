@@ -8,7 +8,7 @@ using std::string;
 using std::vector;
 
 namespace common {
-    static const symbol S_SYS = symbol("SYS", 4);
+    static const symbol S_SYS = symbol("EOS", 4);
     static const symbol S_RAM = symbol("RAMCORE", 4);
     static asset CPU(0'4000, S_SYS);
     static asset NET(0'1000, S_SYS);
