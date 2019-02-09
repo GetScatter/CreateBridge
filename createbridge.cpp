@@ -40,7 +40,7 @@ public:
 
     // Called to claim an account name as the owner of a dapp. 
     // Only the owner account/whitelisted account will be able to create new user account for the dapp 
-    ACTION claim(name& owner, string dapp, asset ram, asset net, asset cpu, bool buy) {
+    ACTION define(name& owner, string dapp, asset ram, asset net, asset cpu, bool buy) {
         require_auth(owner);
         Dappregistry dapps(_self, _self.value);
         auto iterator = dapps.find(toUUID(dapp));
@@ -282,7 +282,7 @@ void apply(uint64_t receiver, uint64_t code, uint64_t action) {
     auto self = receiver;
 
     if( code == self ) switch(action) {
-        EOSIO_DISPATCH_HELPER( createbridge, (clean)(create)(claim)(whitelist) )
+        EOSIO_DISPATCH_HELPER( createbridge, (clean)(create)(define)(whitelist) )
     }
 
     else {
