@@ -14,8 +14,15 @@ namespace balances {
 
     typedef eosio::multi_index<"dappregistry"_n, dappregistry> Dappregistry;
 
+    struct [[eosio::table, eosio::contract("createbridge")]] contributors {
+        name contributor;
+        asset balance;
+        int ram;   // percentage of ram cost the contributor wants to fund
+    };
+
     struct [[eosio::table, eosio::contract("createbridge")]] balances {
         uint64_t memo;
+        vector<contributors> contributors;
         asset balance;
         string origin;
         uint64_t timestamp;

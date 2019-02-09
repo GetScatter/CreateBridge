@@ -7,18 +7,18 @@ If you are an app you can send the `createbridge` contract funds with your `orig
 
 ### Define an account name for your dapp
 
-If you are a dapp, you can define a unique identifier for the dapp and register the `owner` account name for the dapp. Also, you can specify the amount of EOS for ram, net and cpu (in order) to give to the new user accounts. Only the owner account/ whitelisted accounts would be able to create new user accounts for your dapp. 
-- `cleos push action createbridge define '[YOUR_ACCOUNT,"dapp_name",ram,net,cpu]'`
+If you are an app, you can define a unique identifier for the dapp and register the `owner` account name for the dapp. Also, you can specify the amount of EOS for ram, net and cpu (in order) to give to the new user accounts. Only the owner account/ whitelisted accounts would be able to create new user accounts for your dapp. 
+- `cleos push action createbridge define '[YOUR_ACCOUNT,app_name,ram,net,cpu]'`
 
 ### Whitelist other accounts
 
 You can whitelist other accounts, to create account on behalf of your dapp.
--  `cleos push action createbridge whitelist '[YOUR_ACCOUNT,ACCOUNT_NAME,"dapp_name"]'`
+-  `cleos push action createbridge whitelist '[YOUR_ACCOUNT,ACCOUNT_NAME,app_name]'`
 
 ### Partial Costs
 
-You can assume just 50% of the RAM costs for an account.
-- `cleos transfer YOUR_ACCOUNT createbridge "10.0000 EOS" "everipedia.org"`
+You can specify the app you want to contribute to along with the percentage of RAM cost you want to contribute, separated by comma in the memo field for transfer action.
+- `cleos transfer YOUR_ACCOUNT createbridge "10.0000 EOS" "everipedia.org,50"`
 
 ### Full Costs
 

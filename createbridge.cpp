@@ -226,20 +226,34 @@ public:
         return balanceFor(memo).amount > quantity.amount;
     }
 
-    void addBalance(const asset& quantity, string& memo){
-        uint64_t id = toUUID(memo);
+    void addBalance(const name& from, const asset& quantity, string& memo){
+        vector<string> stats = common::split(memo, ',');
+        uint64_t id = toUUID(stats[0]);
+        int ram = stoi(stats[1]);
 
         Balances balances(_self, _self.value);
         auto iterator = balances.find(id);
+
         if(iterator == balances.end()) balances.emplace(_self, [&](auto& row){
             row.memo = id;
+            row.contributors.push_back({from, quantity, ram});
             row.balance = quantity;
-            row.origin = memo;
+            row.origin = stats[0];
             row.timestamp = now();
         });
         else balances.modify(iterator, same_payer, [&](auto& row){
+             auto pred = [from](const contributors & item) {
+                return item.contributor == from;
+            };
+            std::vector<contributors>::iterator itr = std::find_if(std::begin(row.contributors), std::end(row.contributors), pred);    
+            if(itr != std::end(row.contributors)){
+                itr->balance += quantity;
+                itr->ram = ram;
+            } else {
+                row.contributors.push_back({from, quantity, ram});
+                row.timestamp = now();
+            }
             row.balance += quantity;
-            row.timestamp = now();
         });
     }
 
@@ -272,7 +286,7 @@ public:
         if(from == name("eosio.stake")) return;
         if(quantity.symbol != S_SYS) return;
         if(memo.length() > 64) return;
-        addBalance(quantity, memo);
+        addBalance(from, quantity, memo);
     }
 
 };
