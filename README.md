@@ -13,7 +13,7 @@ If you are a dapp, you can define a unique identifier for the dapp and register 
 ### Whitelist other accounts
 
 You can whitelist other accounts, to create account on behalf of your dapp.
--  `cleos push action createbridge whitelist '[YOUR_ACCOUNT,ACCOUNT_NAME,"dapp_name"]' -p app.apim@active`
+-  `cleos push action createbridge whitelist '[YOUR_ACCOUNT,ACCOUNT_NAME,"dapp_name"]'`
 
 ### Partial Costs
 
