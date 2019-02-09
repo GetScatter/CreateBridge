@@ -3,9 +3,17 @@
 This is an EOSIO account creator contract that allows apps to assume portions of the costs for account creation.
 
 
-If you are an app you can send the `createbridge` contract funds with your `origin` as the memo to allocate some funds which
-will be used to pay for 1/2 of the user's account's RAM.
+If you are an app you can send the `createbridge` contract funds with your `origin` as the memo to allocate some funds which will be used to pay for 1/2 of the user's account's RAM.
 
+### Register an account name for your dapp
+
+If you are a dapp, you can claim a unique identifier for the dapp and register the `owner` account name for the dapp. Also, you can specify the amount of EOS for ram, net and cpu (in order) to give to the new user accounts. Only the owner account/ whitelisted accounts would be able to create new user accounts for your dapp. 
+- `cleos push action createbridge claim '[YOUR_ACCOUNT,"dapp_name",ram,net,cpu]'`
+
+### Whitelist other accounts
+
+You can whitelist other accounts, to create account on behalf of your dapp.
+-  `cleos push action createbridge whitelist '[YOUR_ACCOUNT,ACCOUNT_NAME,"dapp_name"]' -p app.apim@active`
 
 ### Partial Costs
 

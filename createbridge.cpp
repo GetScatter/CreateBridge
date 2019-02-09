@@ -50,7 +50,6 @@ public:
             row.ram = ram;
             row.net = net;
             row.cpu = cpu;
-            row.buy = buy;
         }); else {
             auto msg = "the dapp " + dapp + " is already registered by another account";
             eosio_assert(false, msg.c_str());
@@ -70,7 +69,6 @@ public:
             auto msg = "the dapp " + dapp + " is not owned by account " + owner.to_string();
             eosio_assert(false, msg.c_str());
         }
-
     }
 
     ACTION create(string& memo, name& account, public_key& key, string& origin){
