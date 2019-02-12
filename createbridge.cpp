@@ -1,4 +1,6 @@
 #include <eosiolib/eosio.hpp>
+#include <eosiolib/print.hpp>
+#include <eosiolib/action.hpp>
 
 #include "lib/common.h"
 #include "models/accounts.h"
@@ -42,7 +44,7 @@ public:
     // Only the owner account/whitelisted account will be able to create new user account for the dapp 
     ACTION define(name& owner, string dapp, asset ram, asset net, asset cpu, bool buy) {
         require_auth(owner);
-        Dappregistry dapps(_self, _self.value);
+        Registry dapps(_self, _self.value);
         auto iterator = dapps.find(toUUID(dapp));
         if(iterator == dapps.end())dapps.emplace(_self, [&](auto& row){
             row.owner = owner;
@@ -60,7 +62,7 @@ public:
     ACTION whitelist(name owner, name account, string dapp){
         require_auth(owner);
 
-        Dappregistry dapps(_self, _self.value);
+        Registry dapps(_self, _self.value);
         auto iterator = dapps.find(toUUID(dapp));
 
         if(iterator != dapps.end() && owner == iterator->owner)dapps.modify(iterator, same_payer, [&](auto& row){
@@ -71,26 +73,52 @@ public:
         }
     }
 
-    ACTION create(string& memo, name& account, public_key& key, string& origin){
-        require_auth(_self);
+    ACTION create(string& memo, name& account, public_key& ownerkey, public_key& activekey, string& origin){
+        Registry dapps(_self, _self.value);
+        
+        auto iterator = dapps.find(toUUID(origin));
+        if(iterator != dapps.end())
+        {
+            if(name(memo)== iterator->owner){
+                require_auth(iterator->owner);
+            }else if(checkIfWhitelisted(name(memo), origin)){
+                require_auth(name(memo));
+            } else {
+                auto msg = "only owner or whitelisted accounts can create new user accounts for " + origin;
+                eosio_assert(false, msg.c_str());
+            }
+        }else {
+            auto msg = "no owner account found for " + memo;
+            eosio_assert(false, msg.c_str());
+        }
 
-        key_weight k = key_weight{key, 1};
-        authority auth{
+        key_weight ok = key_weight{ownerkey, 1};
+        authority ownerAuth{
                 .threshold = 1,
-                .keys = {k},
+                .keys = {ok},
+                .accounts = {},
+                .waits = {}
+        };
+
+        key_weight ak = key_weight{activekey, 1};
+        authority activeAuth{
+                .threshold = 1,
+                .keys = {ak},
                 .accounts = {},
                 .waits = {}
         };
 
         asset ram = getRamCost();
         asset minimumCost = ram + asset(0'5000, S_SYS);
-
+        
         string freeId = "free";
         string originFreeId = origin+"::free";
 
-        if(hasBalance(originFreeId, minimumCost)) createFreeAccount(memo, account, auth, ram, originFreeId);
-        else if(hasBalance(freeId, minimumCost))  createFreeAccount(memo, account, auth, ram, freeId);
-        else                                      createJointAccount(memo, account, origin, auth, ram);
+        if(hasBalance(originFreeId, minimumCost)) createFreeAccount(memo, account, ownerAuth, activeAuth, ram, originFreeId);
+        else if(hasBalance(freeId, minimumCost))  createFreeAccount(memo, account, ownerAuth, activeAuth, ram, freeId);
+        else {
+            createJointAccount(memo, account, origin, ownerAuth, activeAuth, ram);        
+        }                                    
     }
 
 
@@ -101,10 +129,10 @@ public:
     /***                                        ***/
     /**********************************************/
 
-    void createFreeAccount(string& memo, name& account, authority& auth, asset& ram, string& id){
-        createAccount(account, auth, ram, NET, CPU);
+    void createFreeAccount(string& memo, name& account, authority& ownerAuth, authority& activeAuth, asset& ram, string& id){
+        createAccount(account, ownerAuth, activeAuth, ram, NET, CPU);
 
-        subBalance(id, ram + asset(0'5000, S_SYS));
+        //subBalance(id, ram + asset(0'5000, S_SYS));
 
         if(hasBalance(memo, asset(0'0000, S_SYS))) {
             asset remainder = balanceFor(memo);
@@ -114,46 +142,83 @@ public:
                     name("transfer"),
                     make_tuple(_self, account, remainder, memo)
             ).send();
-            subBalance(memo, remainder);
+          //  subBalance(memo, remainder);
         }
     }
 
-    void createJointAccount(string& memo, name& account, string& origin, authority& auth, asset& ram){
-        Balances balances(_self, _self.value);
+    void createJointAccount(string& memo, name& account, string& origin, authority& ownerAuth, authority& activeAuth, asset& ram){
+        // memo is the account that pays the remaining balance i.e
+        // balance needed for new account creation - (balance contributed by the contributors)
+        name contributor;
 
-        uint64_t payerId = toUUID(memo);
-        auto payer = balances.find(payerId);
-        eosio_assert(payer != balances.end(), "Could not find balance");
-        asset fromPayer = payer->balance;
+        asset balance;
+        asset requiredBalance;
 
         asset ramFromPayer = ram;
         asset ramFromDapp = asset(0'0000, S_SYS);
+
+        Balances balances(_self, _self.value);
 
         if(memo != origin && hasBalance(origin, ram)){
             uint64_t originId = toUUID(origin);
             auto dapp = balances.find(originId);
 
             if(dapp != balances.end()){
-                ramFromDapp.amount = ram.amount/2;
+                // TODO: add the "find the contributor" logic here
+                // TODO: fix this, get ram requirement from the registry table for the dapp
+                contributor = dapp->contributors[1].contributor;
+                ramFromDapp =  asset(0'5000, S_SYS);
                 ramFromPayer -= ramFromDapp;
             }
         }
 
-        asset requiredBalance = ramFromPayer + CPU + NET;
-
-        if(!hasBalance(memo, requiredBalance)){
-            eosio_assert(false, "Not enough to pay for account.");
+        if(ramFromPayer > asset(0'0000, S_SYS)){
+            // find the balance of the "memo" account for the origin and check if it has balance >= total balance for RAM, CPU and net - (balance payed by the contributors)
+            asset balance = findContribution(origin, name(memo));
+            requiredBalance = ramFromPayer + CPU + NET;
+            if(balance < requiredBalance){
+            auto msg = "Not enough balance in "+ memo + " to pay for account creation.";
+            eosio_assert(false, msg.c_str());
+            }
         }
 
-        createAccount(account, auth, ram, NET, CPU);
+        // TODO: get net and cpu requirement from the registry table for the dapp
+        createAccount(account, ownerAuth, activeAuth, ram, NET, CPU);
 
-        subBalance(memo, requiredBalance);
+        subBalance(memo, origin, requiredBalance);
 
         if(ramFromDapp.amount > 0){
-            subBalance(origin, ramFromDapp);
+            subBalance(contributor.to_string(), origin, ramFromDapp);
         }
     }
 
+    bool checkIfWhitelisted(name account, string dapp){
+        Registry dapps(_self, _self.value);
+        auto iterator = dapps.find(toUUID(dapp));
+        auto position_in_whitelist = std::find(iterator->whitelisted_accounts.begin(), iterator->whitelisted_accounts.end(), account); 
+        if(position_in_whitelist != iterator->whitelisted_accounts.end()){
+            return true;
+        }
+        return false;
+    }
+
+    asset findContribution(string dapp, name contributor){
+        Balances balances(_self, _self.value);
+        uint64_t id = toUUID(dapp);
+        auto iterator = balances.find(id);
+        auto pred = [contributor](const contributors & item) {
+                return item.contributor == contributor;
+        };
+        auto itr = std::find_if(std::begin(iterator->contributors), std::end(iterator->contributors), pred);    
+        if(itr != std::end(iterator->contributors)){
+            return itr->balance;
+        } else {
+            auto msg = "No contribution found for " + dapp + "by " + contributor.to_string();
+            eosio_assert(false, msg.c_str());
+        }
+    }
+
+    
     /***
      * Gets the current RAM cost in EOS for 4096 bytes of RAM.
      * @return
@@ -171,12 +236,12 @@ public:
     /***
      * Creates an account based on passed in values
      */
-    void createAccount(name& account, authority& auth, asset& ram, asset& net, asset& cpu){
+    void createAccount(name& account, authority& ownerauth, authority& activeauth, asset& ram, asset& net, asset& cpu){
         newaccount new_account = newaccount{
             .creator = _self,
             .name = account,
-            .owner = auth,
-            .active = auth
+            .owner = ownerauth,
+            .active = activeauth
         };
 
         action(
@@ -242,7 +307,7 @@ public:
             row.timestamp = now();
         });
         else balances.modify(iterator, same_payer, [&](auto& row){
-             auto pred = [from](const contributors & item) {
+            auto pred = [from](const contributors & item) {
                 return item.contributor == from;
             };
             std::vector<contributors>::iterator itr = std::find_if(std::begin(row.contributors), std::end(row.contributors), pred);    
@@ -257,8 +322,8 @@ public:
         });
     }
 
-    void subBalance(string& memo, const asset& quantity){
-        uint64_t id = toUUID(memo);
+    void subBalance(string memo, string&origin, const asset& quantity){
+        uint64_t id = toUUID(origin);
 
         Balances balances(_self, _self.value);
         auto iterator = balances.find(id);
@@ -271,7 +336,17 @@ public:
         }
 
         else balances.modify(iterator, same_payer, [&](auto& row){
-            row.balance -= quantity;
+            auto pred = [memo](const contributors & item) {
+                return item.contributor == name(memo);
+            };
+            auto itr = std::find_if(std::begin(row.contributors), std::end(row.contributors), pred);    
+            if(itr != std::end(row.contributors)){
+                row.balance -= quantity;
+                itr->balance -= quantity;
+            } else {
+                auto msg = "The account " + memo + "not found as one of the contributors for " + origin; 
+                eosio_assert(false, msg.c_str());
+            }
         });
     }
 

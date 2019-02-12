@@ -2,7 +2,7 @@
 
 namespace balances {
 
-    struct [[eosio::table, eosio::contract("createbridge")]] dappregistry {
+    struct [[eosio::table, eosio::contract("createbridge")]] registry {
         name owner;
         string dapp;
         asset ram; // ram in addition to the minimum required for account creation to put in the new user account created for the dapp
@@ -12,12 +12,14 @@ namespace balances {
         uint64_t primary_key() const {return common::toUUID(dapp);}
     };
 
-    typedef eosio::multi_index<"dappregistry"_n, dappregistry> Dappregistry;
+    typedef eosio::multi_index<"registry"_n, registry> Registry;
 
     struct [[eosio::table, eosio::contract("createbridge")]] contributors {
         name contributor;
         asset balance;
         int ram;   // percentage of ram cost the contributor wants to fund
+        // add below flag later
+        //bool useForRemainingBalance;
     };
 
     struct [[eosio::table, eosio::contract("createbridge")]] balances {
