@@ -159,6 +159,13 @@ public:
 
         Balances balances(_self, _self.value);
 
+        // Get ram, net and cpu requirements for the new user accounts from the dapp registry
+        Registry dapps(_self, _self.value);
+        auto iterator = dapps.find(toUUID(origin));
+        asset ramAmount = iterator->ram;
+        asset net = iterator->net;
+        asset cpu = iterator->cpu;
+
         if(memo != origin && hasBalance(origin, ram)){
             uint64_t originId = toUUID(origin);
             auto dapp = balances.find(originId);
@@ -167,7 +174,7 @@ public:
                 // TODO: add the "find the contributor" logic here
                 // TODO: fix this, get ram requirement from the registry table for the dapp
                 contributor = dapp->contributors[1].contributor;
-                ramFromDapp =  asset(0'5000, S_SYS);
+                ramFromDapp = (dapp->contributors[1].ram * ramAmount)/100;
                 ramFromPayer -= ramFromDapp;
             }
         }
@@ -175,7 +182,7 @@ public:
         if(ramFromPayer > asset(0'0000, S_SYS)){
             // find the balance of the "memo" account for the origin and check if it has balance >= total balance for RAM, CPU and net - (balance payed by the contributors)
             asset balance = findContribution(origin, name(memo));
-            requiredBalance = ramFromPayer + CPU + NET;
+            requiredBalance = ramFromPayer + cpu + net;
             if(balance < requiredBalance){
             auto msg = "Not enough balance in "+ memo + " to pay for account creation.";
             eosio_assert(false, msg.c_str());
@@ -237,6 +244,7 @@ public:
      * Creates an account based on passed in values
      */
     void createAccount(name& account, authority& ownerauth, authority& activeauth, asset& ram, asset& net, asset& cpu){
+        // FIX it to delegate from createbridge, instead of buying and staking from the new account created
         newaccount new_account = newaccount{
             .creator = _self,
             .name = account,
