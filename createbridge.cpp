@@ -6,14 +6,12 @@
 #include "models/accounts.h"
 #include "models/balances.h"
 #include "models/registry.h"
-#include "models/airdrops.h"
 
 using namespace eosio;
 using namespace common;
 using namespace accounts;
 using namespace registry;
 using namespace balances;
-using namespace airdrops;
 using namespace std;
 
 CONTRACT createbridge : contract {
@@ -43,9 +41,19 @@ public:
     /**********************************************/
 
 
-    // Called to claim an account name as the owner of a dapp. 
-    // Only the owner account/whitelisted account will be able to create new user account for the dapp 
-    ACTION define(name& owner, string dapp, asset ram, asset net, asset cpu, bool buy) {
+    /***
+     * Called to define an account name as the owner of a dapp along with the following details:
+     * owner:           account name to be registered as the owner of the dapp 
+     * dapp:            the string/account name representing the dapp
+     * ram:             ram to put in the new user account created for the dapp
+     * net:             EOS amount to be staked for net
+     * cpu:             EOS amount to be staked for cpu
+     * airdropcontract: dapp token contract
+     * airdroptoken:    the total supply of dapp tokens to be airdropped
+     * airdroplimit:    token amount to be airdropped to new users for the dapp
+     * Only the owner account/whitelisted account will be able to create new user account for the dapp
+     */ 
+    ACTION define(name& owner, string dapp, asset ram, asset net, asset cpu, name airdropcontract, asset airdroptokens, asset airdroplimit) {
         require_auth(owner);
         Registry dapps(_self, _self.value);
         auto iterator = dapps.find(toUUID(dapp));
@@ -55,13 +63,18 @@ public:
             row.ram = ram;
             row.net = net;
             row.cpu = cpu;
+            row.airdropcontract = airdropcontract;
+            row.airdroptokens = airdroptokens;
+            row.airdroplimit = airdroplimit;
         }); else {
             auto msg = "the dapp " + dapp + " is already registered by another account";
             eosio_assert(false, msg.c_str());
         }
     }
 
-    // lets the owner account of the dapp to whitelist other accounts. 
+    /***
+     * Lets the owner account of the dapp to whitelist other accounts. 
+     */ 
     ACTION whitelist(name owner, name account, string dapp){
         require_auth(owner);
 
@@ -76,6 +89,9 @@ public:
         }
     }
 
+    /***
+     * Creates a new user account
+     */ 
     ACTION create(string& memo, name& account, public_key& ownerkey, public_key& activekey, string& origin){
         Registry dapps(_self, _self.value);
         
@@ -126,7 +142,56 @@ public:
         }                                    
     }
 
+    /***
+     * Transfers the remaining balance of a contributor from createbridge back to the contributor
+     */ 
+    ACTION reclaim(name reclaimer, string dapp){
+        require_auth(reclaimer);
 
+        asset reclaimer_balance;
+        bool nocontributor;
+
+        Balances balances(_self, _self.value);
+
+        auto iterator = balances.find(common::toUUID(dapp));
+        auto msg = "no funds given by " + reclaimer.to_string() +  " for " + dapp;
+
+        if(iterator != balances.end()){
+
+            balances.modify(iterator, same_payer, [&](auto& row){
+                auto pred = [reclaimer](const contributors & item) {
+                    return item.contributor == reclaimer;
+                };
+                auto reclaimer_record = remove_if(std::begin(row.contributors), std::end(row.contributors), pred);
+                if(reclaimer_record != row.contributors.end()){
+                    reclaimer_balance = reclaimer_record->balance;
+                    row.contributors.erase(reclaimer_record, row.contributors.end());
+                    row.balance -= reclaimer_balance;
+                } else {
+                    eosio_assert(false, msg.c_str());
+                }
+
+                nocontributor = row.contributors.empty();
+            });
+
+            // delete the entire balance object if no contributors are there for the dapp
+            if(nocontributor && iterator->balance == asset(0'0000, S_SYS)){
+                    balances.erase(iterator);
+            }
+
+            // transfer the remaining balance for the contributor from the createbridge account to contributor's account
+            auto memo = "reimburse the remaining balance to " + reclaimer.to_string();
+            action(
+                permission_level{ _self, "active"_n },
+                name("eosio.token"),
+                name("transfer"),
+                make_tuple(_self, reclaimer, reclaimer_balance, memo)
+            ).send();
+
+        } else {
+            eosio_assert(false, msg.c_str());
+        } 
+    }
 
     /**********************************************/
     /***                                        ***/
@@ -142,10 +207,10 @@ public:
         if(hasBalance(memo, asset(0'0000, S_SYS))) {
             asset remainder = balanceFor(memo);
             action(
-                    permission_level{ _self, "active"_n },
-                    name("eosio.token"),
-                    name("transfer"),
-                    make_tuple(_self, account, remainder, memo)
+                permission_level{ _self, "active"_n },
+                name("eosio.token"),
+                name("transfer"),
+                make_tuple(_self, account, remainder, memo)
             ).send();
             //subBalance(memo, remainder);
         }
@@ -378,7 +443,7 @@ void apply(uint64_t receiver, uint64_t code, uint64_t action) {
     auto self = receiver;
 
     if( code == self ) switch(action) {
-        EOSIO_DISPATCH_HELPER( createbridge, (clean)(create)(define)(whitelist) )
+        EOSIO_DISPATCH_HELPER( createbridge, (clean)(create)(define)(whitelist)(reclaim))
     }
 
     else {
