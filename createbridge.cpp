@@ -5,12 +5,15 @@
 #include "lib/common.h"
 #include "models/accounts.h"
 #include "models/balances.h"
+#include "models/registry.h"
+#include "models/airdrops.h"
 
 using namespace eosio;
 using namespace common;
 using namespace accounts;
+using namespace registry;
 using namespace balances;
-
+using namespace airdrops;
 using namespace std;
 
 CONTRACT createbridge : contract {
@@ -77,6 +80,8 @@ public:
         Registry dapps(_self, _self.value);
         
         auto iterator = dapps.find(toUUID(origin));
+
+        // Only owner/whitelisted account for the dapp can create accounts
         if(iterator != dapps.end())
         {
             if(name(memo)== iterator->owner){
@@ -142,7 +147,7 @@ public:
                     name("transfer"),
                     make_tuple(_self, account, remainder, memo)
             ).send();
-          //  subBalance(memo, remainder);
+            //subBalance(memo, remainder);
         }
     }
 
@@ -159,7 +164,7 @@ public:
 
         Balances balances(_self, _self.value);
 
-        // Get ram, net and cpu requirements for the new user accounts from the dapp registry
+        // Gets the ram, net and cpu requirements for the new user accounts from the dapp registry
         Registry dapps(_self, _self.value);
         auto iterator = dapps.find(toUUID(origin));
         asset ramAmount = iterator->ram;
@@ -172,7 +177,6 @@ public:
 
             if(dapp != balances.end()){
                 // TODO: add the "find the contributor" logic here
-                // TODO: fix this, get ram requirement from the registry table for the dapp
                 contributor = dapp->contributors[1].contributor;
                 ramFromDapp = (dapp->contributors[1].ram * ramAmount)/100;
                 ramFromPayer -= ramFromDapp;
@@ -189,7 +193,6 @@ public:
             }
         }
 
-        // TODO: get net and cpu requirement from the registry table for the dapp
         createAccount(account, ownerAuth, activeAuth, ram, NET, CPU);
 
         subBalance(memo, origin, requiredBalance);
@@ -209,6 +212,10 @@ public:
         return false;
     }
 
+    /***
+     * Gets the balance of a contributor for a dapp
+     * @return
+     */
     asset findContribution(string dapp, name contributor){
         Balances balances(_self, _self.value);
         uint64_t id = toUUID(dapp);
@@ -216,7 +223,7 @@ public:
         auto pred = [contributor](const contributors & item) {
                 return item.contributor == contributor;
         };
-        auto itr = std::find_if(std::begin(iterator->contributors), std::end(iterator->contributors), pred);    
+        auto itr = std::find_if(std::begin(iterator->contributors), std::end(iterator->contributors), pred);  
         if(itr != std::end(iterator->contributors)){
             return itr->balance;
         } else {
@@ -224,7 +231,6 @@ public:
             eosio_assert(false, msg.c_str());
         }
     }
-
     
     /***
      * Gets the current RAM cost in EOS for 4096 bytes of RAM.
@@ -273,12 +279,6 @@ public:
             make_tuple(_self, account, net, cpu, true)
         ).send();
     }
-
-
-
-
-
-
 
 
     /**********************************************/
@@ -371,7 +371,6 @@ public:
         if(memo.length() > 64) return;
         addBalance(from, quantity, memo);
     }
-
 };
 
 extern "C" {
