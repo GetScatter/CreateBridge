@@ -90,8 +90,13 @@ public:
     }
 
     /***
-     * Creates a new user account
-     */ 
+     * Creates a new user account.
+     * It also airdrops custom dapp tokens to the new user account if a dapp owner has opted for airdrops
+     * memo:                name of the account paying for the balance left after getting the donation from the dapp contributors 
+     * account:             name of the account to be created
+     * ownerkey,activekey:  key pair for the new account  
+     * origin:              the string representing the dapp to create the new user account for. For ex- everipedia.org, lumeos
+     */
     ACTION create(string& memo, name& account, public_key& ownerkey, public_key& activekey, string& origin){
         Registry dapps(_self, _self.value);
         
@@ -133,43 +138,45 @@ public:
         asset minimumCost = ram + asset(0'5000, S_SYS);
         
         string freeId = "free";
-        string originFreeId = origin+"::free";
 
-        if(hasBalance(originFreeId, minimumCost)) createFreeAccount(memo, account, ownerAuth, activeAuth, ram, originFreeId);
-        else if(hasBalance(freeId, minimumCost))  createFreeAccount(memo, account, ownerAuth, activeAuth, ram, freeId);
-        else {
-            createJointAccount(memo, account, origin, ownerAuth, activeAuth, ram);        
-        }                                    
+        createJointAccount(memo, account, ownerAuth, activeAuth, ram, origin);                               
     }
 
     /***
      * Transfers the remaining balance of a contributor from createbridge back to the contributor
+     * reclaimer: account trying to reclaim the balance
+     * dapp:      the dapp name for which the account is trying to reclaim the balance
+     * sym:       symbol of the tokens to be reclaimed. It can have value based on the following scenarios:
+     *            - reclaim the "native" token balance used to create accounts. For ex - EOS/SYS
+     *            - reclaim the remaining airdrop token balance used to airdrop dapp tokens to new user accounts. For ex- IQ/LUM
      */ 
-    ACTION reclaim(name reclaimer, string dapp){
+    ACTION reclaim(name reclaimer, string dapp, string sym){
         require_auth(reclaimer);
 
         asset reclaimer_balance;
         bool nocontributor;
 
-        Balances balances(_self, _self.value);
+        // check if the user is trying to reclaim the system tokens
+        if(sym == S_SYS.code().to_string()){
+            Balances balances(_self, _self.value);
 
-        auto iterator = balances.find(common::toUUID(dapp));
-        auto msg = "no funds given by " + reclaimer.to_string() +  " for " + dapp;
+            auto iterator = balances.find(common::toUUID(dapp));
 
-        if(iterator != balances.end()){
+            if(iterator != balances.end()){
 
-            balances.modify(iterator, same_payer, [&](auto& row){
-                auto pred = [reclaimer](const contributors & item) {
-                    return item.contributor == reclaimer;
-                };
-                auto reclaimer_record = remove_if(std::begin(row.contributors), std::end(row.contributors), pred);
-                if(reclaimer_record != row.contributors.end()){
-                    reclaimer_balance = reclaimer_record->balance;
-                    row.contributors.erase(reclaimer_record, row.contributors.end());
-                    row.balance -= reclaimer_balance;
-                } else {
+                balances.modify(iterator, same_payer, [&](auto& row){
+                    auto pred = [reclaimer](const contributors & item) {
+                        return item.contributor == reclaimer;
+                    };
+                    auto reclaimer_record = remove_if(std::begin(row.contributors), std::end(row.contributors), pred);
+                    if(reclaimer_record != row.contributors.end()){
+                        reclaimer_balance = reclaimer_record->balance;
+                        row.contributors.erase(reclaimer_record, row.contributors.end());
+                        row.balance -= reclaimer_balance;
+                    } else {
+                    auto msg = "no remaining contribution for " + dapp + " by " + reclaimer.to_string();
                     eosio_assert(false, msg.c_str());
-                }
+                    }   
 
                 nocontributor = row.contributors.empty();
             });
@@ -188,9 +195,32 @@ public:
                 make_tuple(_self, reclaimer, reclaimer_balance, memo)
             ).send();
 
-        } else {
-            eosio_assert(false, msg.c_str());
+            } else {
+                auto msg = "no funds given by " + reclaimer.to_string() +  " for " + dapp;
+                eosio_assert(false, msg.c_str());
+            } 
+
         } 
+        // user is trying to reclaim custom dapp tokens
+        else {
+            Registry dapps(_self, _self.value);
+            auto iterator = dapps.find(toUUID(dapp));
+            if(iterator != dapps.end())dapps.modify(iterator, same_payer, [&](auto& row){
+                if(row.airdropcontract != name("") && row.airdroptokens.symbol.code().to_string() == sym && row.owner == name(reclaimer)){
+                    auto memo = "reimburse the remaining airdrop balance for " + dapp + " to " + reclaimer.to_string();
+                    action(
+                        permission_level{ _self, "active"_n },
+                        row.airdropcontract,
+                        name("transfer"),
+                        make_tuple(_self, reclaimer, row.airdroptokens, memo)
+                    ).send();
+                    row.airdroptokens -= row.airdroptokens;
+                } else {
+                    auto msg = "the remaining airdrop balance for " + dapp + " can only be claimed by its owner/whitelisted account.";
+                    eosio_assert(false, msg.c_str());
+                }
+            });  
+        }
     }
 
     /**********************************************/
@@ -198,23 +228,6 @@ public:
     /***                Helpers                 ***/
     /***                                        ***/
     /**********************************************/
-
-    void createFreeAccount(string& memo, name& account, authority& ownerAuth, authority& activeAuth, asset& ram, string& id){
-        createAccount(account, ownerAuth, activeAuth, ram, NET, CPU);
-
-        //subBalance(id, ram + asset(0'5000, S_SYS));
-
-        if(hasBalance(memo, asset(0'0000, S_SYS))) {
-            asset remainder = balanceFor(memo);
-            action(
-                permission_level{ _self, "active"_n },
-                name("eosio.token"),
-                name("transfer"),
-                make_tuple(_self, account, remainder, memo)
-            ).send();
-            //subBalance(memo, remainder);
-        }
-    }
 
     void createJointAccount(string& memo, name& account, string& origin, authority& ownerAuth, authority& activeAuth, asset& ram){
         // memo is the account that pays the remaining balance i.e
@@ -318,9 +331,6 @@ public:
         return asset((((double)quote / base))*4096, S_SYS);
     }
 
-    /***
-     * Creates an account based on passed in values
-     */
     void createAccount(name& account, authority& ownerauth, authority& activeauth, asset& ram, asset& net, asset& cpu){
         // FIX it to delegate from createbridge, instead of buying and staking from the new account created
         newaccount new_account = newaccount{
@@ -450,11 +460,16 @@ public:
     /***                                        ***/
     /**********************************************/
 
+    /*
+    * Called when a new user account is created
+    * Transfers the dapp tokens to the new account created
+    */
     void airdrop(string dapp, name account){
         Registry dapps(_self, _self.value);
         auto iterator = dapps.find(toUUID(dapp));
         if(iterator != dapps.end())dapps.modify(iterator, same_payer, [&](auto& row){
-            if(row.airdropcontract != name("")){
+            // check if the dapp has opted for airdrop
+            if(row.airdropcontract != name("") && row.airdroptokens.amount > 0){
                 asset tokens = row.airdroplimit;
                 auto memo = "airdrop " + tokens.to_string() + " to " + account.to_string();
                 action(
