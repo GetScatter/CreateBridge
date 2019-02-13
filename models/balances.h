@@ -6,8 +6,6 @@ namespace balances {
         name contributor;
         asset balance;
         int ram;   // percentage of ram cost the contributor wants to fund
-        // add below flag later
-        //bool useForRemainingBalance;
     };
 
     struct [[eosio::table, eosio::contract("createbridge")]] balances {
