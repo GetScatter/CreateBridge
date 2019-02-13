@@ -229,7 +229,7 @@ public:
 
         Balances balances(_self, _self.value);
 
-        // Gets the ram, net and cpu requirements for the new user accounts from the dapp registry
+        // gets the ram, net and cpu requirements for the new user accounts from the dapp registry
         Registry dapps(_self, _self.value);
         auto iterator = dapps.find(toUUID(origin));
         asset ramAmount = iterator->ram;
@@ -248,8 +248,8 @@ public:
             }
         }
 
+        // find the balance of the "memo" account for the origin and check if it has balance >= total balance for RAM, CPU and net - (balance payed by the contributors)
         if(ramFromPayer > asset(0'0000, S_SYS)){
-            // find the balance of the "memo" account for the origin and check if it has balance >= total balance for RAM, CPU and net - (balance payed by the contributors)
             asset balance = findContribution(origin, name(memo));
             requiredBalance = ramFromPayer + cpu + net;
             if(balance < requiredBalance){
@@ -260,13 +260,20 @@ public:
 
         createAccount(account, ownerAuth, activeAuth, ram, NET, CPU);
 
+        // subtract the used balance 
         subBalance(memo, origin, requiredBalance);
-
         if(ramFromDapp.amount > 0){
             subBalance(contributor.to_string(), origin, ramFromDapp);
         }
+
+        // airdrop dapp tokens if requested
+        airdrop(origin, account);
     }
 
+    /***
+     * Checks if an account is whitelisted for a dapp by the owner of the dapp
+     * @return
+     */
     bool checkIfWhitelisted(name account, string dapp){
         Registry dapps(_self, _self.value);
         auto iterator = dapps.find(toUUID(dapp));
@@ -435,6 +442,30 @@ public:
         if(quantity.symbol != S_SYS) return;
         if(memo.length() > 64) return;
         addBalance(from, quantity, memo);
+    }
+
+    /**********************************************/
+    /***                                        ***/
+    /***               Airdrops                 ***/
+    /***                                        ***/
+    /**********************************************/
+
+    void airdrop(string dapp, name account){
+        Registry dapps(_self, _self.value);
+        auto iterator = dapps.find(toUUID(dapp));
+        if(iterator != dapps.end())dapps.modify(iterator, same_payer, [&](auto& row){
+            if(row.airdropcontract != name("")){
+                asset tokens = row.airdroplimit;
+                auto memo = "airdrop " + tokens.to_string() + " to " + account.to_string();
+                action(
+                    permission_level{ _self, "active"_n },
+                    row.airdropcontract,
+                    name("transfer"),
+                    make_tuple(_self, account, tokens, memo)
+                ).send();
+                row.airdroptokens -= tokens;
+            }
+        });   
     }
 };
 
