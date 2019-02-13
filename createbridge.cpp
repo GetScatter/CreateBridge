@@ -233,17 +233,21 @@ public:
         // memo is the account that pays the remaining balance i.e
         // balance needed for new account creation - (balance contributed by the contributors)
         name contributor;
+        name freeContributor;
 
         asset balance;
         asset requiredBalance;
 
         asset ramFromPayer = ram;
         asset ramFromDapp = asset(0'0000, S_SYS);
+        asset ramFromGlobalFund = asset(0'0000, S_SYS);
 
+        string freeId = "free";
+        
         Balances balances(_self, _self.value);
-
-        // gets the ram, net and cpu requirements for the new user accounts from the dapp registry
         Registry dapps(_self, _self.value);
+        
+        // gets the ram, net and cpu requirements for the new user accounts from the dapp registry
         auto iterator = dapps.find(toUUID(origin));
         asset ramAmount = iterator->ram;
         asset net = iterator->net;
@@ -254,7 +258,7 @@ public:
             auto dapp = balances.find(originId);
 
             if(dapp != balances.end()){
-                // TODO: add the "find the contributor" logic here
+                // TODO: call the "find the contributor" logic here for origin as dapp identifier. For ex - everipedia.org
                 contributor = (dapp->contributors[0]).contributor;
                 ramFromDapp = (dapp->contributors[0].ram * ramAmount)/100;
                 ramFromPayer -= ramFromDapp;
@@ -265,20 +269,36 @@ public:
         if(ramFromPayer > asset(0'0000, S_SYS)){
             asset balance = findContribution(origin, name(memo));
             requiredBalance = ramFromPayer + cpu + net;
+            // if the "memo" account doesn't have enough fund, check globally available "free" pool
             if(balance < requiredBalance){
-            auto msg = "Not enough balance in "+ memo + " to pay for account creation.";
-            eosio_assert(false, msg.c_str());
+                // TODO: call the "find the contributor" logic here for origin "free"
+                auto dapp = balances.find(freeId);
+                freeContributor = (dapp->contributors[0]).contributor;
+                ramFromGlobalFund = findContribution(freeId, name(freeContributor));
+                ramFromPayer = asset(0'0000, S_SYS);
+                if(ramFromGlobalFund < requiredBalance){
+                    auto msg = "Not enough balance in "+ memo + " or the globally available free fund to pay for account creation.";
+                    eosio_assert(false, msg.c_str());
+                }
             }
         }
 
         createAccount(account, ownerAuth, activeAuth, ram, NET, CPU);
 
         // subtract the used balance 
-        subBalance(memo, origin, requiredBalance);
+        if(ramFromPayer.amount > 0)
+        {
+            subBalance(memo, origin, requiredBalance);
+        }
+
         if(ramFromDapp.amount > 0){
             subBalance(contributor.to_string(), origin, ramFromDapp);
         }
 
+        if(ramFromGlobalFund.amount > 0){
+            subBalance(freeContributor.to_string(), freeId, ramFromDapp);
+        }
+        
         // airdrop dapp tokens if requested
         airdrop(origin, account);
     }
@@ -312,8 +332,8 @@ public:
         if(itr != std::end(iterator->contributors)){
             return itr->balance;
         } else {
-            auto msg = "No contribution found for " + dapp + "by " + contributor.to_string();
-            eosio_assert(false, msg.c_str());
+            auto msg = "No contribution found for " + dapp + "by " + contributor.to_string() + " . Checking the globally available free fund.";
+            print(msg);
         }
     }
     
