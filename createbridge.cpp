@@ -242,8 +242,8 @@ public:
 
             if(dapp != balances.end()){
                 // TODO: add the "find the contributor" logic here
-                contributor = dapp->contributors[1].contributor;
-                ramFromDapp = (dapp->contributors[1].ram * ramAmount)/100;
+                contributor = (dapp->contributors[0]).contributor;
+                ramFromDapp = (dapp->contributors[0].ram * ramAmount)/100;
                 ramFromPayer -= ramFromDapp;
             }
         }
@@ -402,7 +402,7 @@ public:
         });
     }
 
-    void subBalance(string memo, string&origin, const asset& quantity){
+    void subBalance(string memo, string& origin, const asset& quantity){
         uint64_t id = toUUID(origin);
 
         Balances balances(_self, _self.value);
