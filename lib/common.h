@@ -11,10 +11,8 @@ using std::string;
 using std::vector;
 
 namespace common {
-    static const symbol S_SYS = symbol("EOS", 4);
     static const symbol S_RAM = symbol("RAMCORE", 4);
-    static asset CPU(0'4000, S_SYS);
-    static asset NET(0'1000, S_SYS);
+    static const name createbridge = name("createbridge");
 
     inline static uint64_t toUUID(string username){
         return std::hash<string>{}(username);
@@ -30,20 +28,41 @@ namespace common {
         return elems;
     }
 
-    struct rammarket {
-        asset    supply;
+    uint64_t generate_random(uint64_t seed, uint64_t val){
+        const uint64_t a = 1103515245;
+        const uint64_t c = 12345;
 
-        struct connector {
-            asset balance;
-            double weight = .5;
-        };
+        // using LCG alogrithm : https://en.wikipedia.org/wiki/Linear_congruential_generator
+        // used by standard c++ rand function : http://pubs.opengroup.org/onlinepubs/009695399/functions/rand.html
 
-        connector base;
-        connector quote;
+        uint64_t seed2 = (uint32_t)((a * seed + c) % 0x7fffffff);        
+        uint64_t value = ((uint64_t)seed2 * val) >> 31;
 
-        uint64_t primary_key()const { return supply.symbol.raw(); }
+        return value;
+    }
+
+    struct [[eosio::table, eosio::contract("createbridge")]] token {
+        symbol S_SYS;
+        name   newaccountcontract;
+        uint64_t primary_key()const { return S_SYS.raw(); }
     };
 
+    typedef eosio::multi_index<"token"_n, token> Token;
 
-    typedef eosio::multi_index<"rammarket"_n, rammarket> RamInfo;
+    /***
+     * Returns the symbol of the core token of the chain or the token used to pay for new account creation
+     * @return
+     */
+    symbol getCoreSymbol(){
+        Token token(createbridge, createbridge.value);
+        return token.begin()->S_SYS;
+    }
+
+    /***
+     * Returns the contract name for new account action
+     */ 
+    name getNewAccountContract(){
+        Token token(createbridge, createbridge.value);
+        return token.begin()->newaccountcontract;
+    }
 };
