@@ -66,10 +66,19 @@ public:
             row.airdropcontract = airdropcontract;
             row.airdroptokens = airdroptokens;
             row.airdroplimit = airdroplimit;
-        }); else {
+        }); else if (iterator != dapps.end() && iterator->owner == owner)
+            // allow the dapp to modify the stats for new user account
+            dapps.modify(iterator, same_payer, [&](auto& row){
+            row.ram = ram;
+            row.net = net;
+            row.cpu = cpu;
+            row.airdropcontract = airdropcontract;
+            row.airdroptokens = airdroptokens;
+            row.airdroplimit = airdroplimit;
+        }); else{
             auto msg = "the dapp " + dapp + " is already registered by another account";
             eosio_assert(false, msg.c_str());
-        }
+        };
     }
 
     /***
@@ -134,12 +143,9 @@ public:
                 .waits = {}
         };
 
-        asset ram = getRamCost();
-        asset minimumCost = ram + asset(0'5000, S_SYS);
-        
         string freeId = "free";
 
-        createJointAccount(memo, account, ownerAuth, activeAuth, ram, origin);                               
+        createJointAccount(memo, account, origin, ownerAuth, activeAuth);                               
     }
 
     /***
@@ -229,7 +235,7 @@ public:
     /***                                        ***/
     /**********************************************/
 
-    void createJointAccount(string& memo, name& account, string& origin, authority& ownerAuth, authority& activeAuth, asset& ram){
+    void createJointAccount(string& memo, name& account, string& origin, authority& ownerAuth, authority& activeAuth){
         // memo is the account that pays the remaining balance i.e
         // balance needed for new account creation - (balance contributed by the contributors)
         name contributor;
@@ -238,7 +244,6 @@ public:
         asset balance;
         asset requiredBalance;
 
-        asset ramFromPayer = ram;
         asset ramFromDapp = asset(0'0000, S_SYS);
         asset ramFromGlobalFund = asset(0'0000, S_SYS);
 
@@ -249,7 +254,8 @@ public:
         
         // gets the ram, net and cpu requirements for the new user accounts from the dapp registry
         auto iterator = dapps.find(toUUID(origin));
-        asset ramAmount = iterator->ram;
+        asset ram = iterator->ram;
+        asset ramFromPayer = ram;
         asset net = iterator->net;
         asset cpu = iterator->cpu;
 
@@ -260,7 +266,7 @@ public:
             if(dapp != balances.end()){
                 // TODO: call the "find the contributor" logic here for origin as dapp identifier. For ex - everipedia.org
                 contributor = (dapp->contributors[0]).contributor;
-                ramFromDapp = (dapp->contributors[0].ram * ramAmount)/100;
+                ramFromDapp = (dapp->contributors[0].ram * ram)/100;
                 ramFromPayer -= ramFromDapp;
             }
         }
@@ -272,7 +278,7 @@ public:
             // if the "memo" account doesn't have enough fund, check globally available "free" pool
             if(balance < requiredBalance){
                 // TODO: call the "find the contributor" logic here for origin "free"
-                auto dapp = balances.find(freeId);
+                auto dapp = balances.find(toUUID(freeId));
                 freeContributor = (dapp->contributors[0]).contributor;
                 ramFromGlobalFund = findContribution(freeId, name(freeContributor));
                 ramFromPayer = asset(0'0000, S_SYS);
@@ -283,7 +289,7 @@ public:
             }
         }
 
-        createAccount(account, ownerAuth, activeAuth, ram, NET, CPU);
+        createAccount(account, ownerAuth, activeAuth, ram, net, cpu);
 
         // subtract the used balance 
         if(ramFromPayer.amount > 0)
@@ -296,7 +302,7 @@ public:
         }
 
         if(ramFromGlobalFund.amount > 0){
-            subBalance(freeContributor.to_string(), freeId, ramFromDapp);
+            subBalance(freeContributor.to_string(), freeId, requiredBalance);
         }
         
         // airdrop dapp tokens if requested
@@ -325,15 +331,24 @@ public:
         Balances balances(_self, _self.value);
         uint64_t id = toUUID(dapp);
         auto iterator = balances.find(id);
-        auto pred = [contributor](const contributors & item) {
-                return item.contributor == contributor;
-        };
-        auto itr = std::find_if(std::begin(iterator->contributors), std::end(iterator->contributors), pred);  
-        if(itr != std::end(iterator->contributors)){
-            return itr->balance;
+
+        auto msg = "No contribution found for " + dapp + " by " + contributor.to_string() + ". Checking the globally available free fund.";
+
+        // if no record found for the dapp in the balances table, return the balance for the contributor as 0
+        if(iterator != balances.end()){
+            auto pred = [contributor](const contributors & item) {
+                    return item.contributor == contributor;
+            };
+            auto itr = std::find_if(std::begin(iterator->contributors), std::end(iterator->contributors), pred);  
+            if(itr != std::end(iterator->contributors)){
+                return itr->balance;
+            } else{
+                print(msg.c_str());
+                return asset(0'0000, S_SYS);
+            }
         } else {
-            auto msg = "No contribution found for " + dapp + "by " + contributor.to_string() + " . Checking the globally available free fund.";
-            print(msg);
+            print(msg.c_str());
+            return asset(0'0000, S_SYS);
         }
     }
     
@@ -402,9 +417,15 @@ public:
     }
 
     void addBalance(const name& from, const asset& quantity, string& memo){
+        int ram;
         vector<string> stats = common::split(memo, ',');
         uint64_t id = toUUID(stats[0]);
-        int ram = stoi(stats[1]);
+
+        if(stats[0] != "free"){
+            ram = stoi(stats[1]);
+        } else {
+            ram = 100;
+        }
 
         Balances balances(_self, _self.value);
         auto iterator = balances.find(id);
@@ -489,16 +510,21 @@ public:
         auto iterator = dapps.find(toUUID(dapp));
         if(iterator != dapps.end())dapps.modify(iterator, same_payer, [&](auto& row){
             // check if the dapp has opted for airdrop
-            if(row.airdropcontract != name("") && row.airdroptokens.amount > 0){
-                asset tokens = row.airdroplimit;
-                auto memo = "airdrop " + tokens.to_string() + " to " + account.to_string();
-                action(
-                    permission_level{ _self, "active"_n },
-                    row.airdropcontract,
-                    name("transfer"),
-                    make_tuple(_self, account, tokens, memo)
-                ).send();
-                row.airdroptokens -= tokens;
+            if(row.airdropcontract != name("")){
+                if(row.airdroptokens.amount > 0){
+                    asset tokens = row.airdroplimit;
+                    auto memo = "airdrop " + tokens.to_string() + " to " + account.to_string();
+                    action(
+                        permission_level{ _self, "active"_n },
+                        row.airdropcontract,
+                        name("transfer"),
+                        make_tuple(_self, account, tokens, memo)
+                    ).send();
+                    row.airdroptokens -= tokens;
+                } else {
+                    auto msg = "Not enough " + row.airdroptokens.symbol.code().to_string() + " with createbridge to airdrop.";
+                    eosio_assert(false,msg.c_str());
+                }
             }
         });   
     }
