@@ -99,13 +99,17 @@ public:
     }
 
     /***
-     * Creates a new user account.
+     * Creates a new user account. 
      * It also airdrops custom dapp tokens to the new user account if a dapp owner has opted for airdrops
      * memo:                name of the account paying for the balance left after getting the donation from the dapp contributors 
      * account:             name of the account to be created
      * ownerkey,activekey:  key pair for the new account  
      * origin:              the string representing the dapp to create the new user account for. For ex- everipedia.org, lumeos
-     */
+     * For new user accounts, it follows the following steps:
+     * 1. Choose a contributor, if any, for the dapp to fund the cost for new account creation
+     * 2. Check if the contributor is funding 100 %. If not, check if the "memo" account has enough to fund the remaining cost of account creation
+     * 3. If not, then check the globally available free fund for the remaining cost of an account creation
+    */
     ACTION create(string& memo, name& account, public_key& ownerkey, public_key& activekey, string& origin){
         Registry dapps(_self, _self.value);
         
