@@ -40,7 +40,20 @@ public:
     /***                                        ***/
     /**********************************************/
 
+    /***
+     * Specify the core token of the chain or the token used to pay for new user accounts of the chain  
+    */
+    ACTION set(const symbol& symbol){
+        require_auth(_self);
+        Token token(_self, _self.value);
+        auto iterator = token.find(symbol.raw());
+        if(iterator == token.end())token.emplace(_self, [&](auto& row){
+            row.S_SYS = symbol;
 
+        }); else {
+            eosio_assert(false, "the core symbol of the chain has already been defined.");
+        }      
+    }
     /***
      * Called to define an account name as the owner of a dapp along with the following details:
      * owner:           account name to be registered as the owner of the dapp 
@@ -167,7 +180,7 @@ public:
         bool nocontributor;
 
         // check if the user is trying to reclaim the system tokens
-        if(sym == S_SYS.code().to_string()){
+        if(sym == getCoreSymbol().code().to_string()){
             Balances balances(_self, _self.value);
 
             auto iterator = balances.find(common::toUUID(dapp));
@@ -192,7 +205,7 @@ public:
             });
 
             // delete the entire balance object if no contributors are there for the dapp
-            if(nocontributor && iterator->balance == asset(0'0000, S_SYS)){
+            if(nocontributor && iterator->balance == asset(0'0000, getCoreSymbol())){
                     balances.erase(iterator);
             }
 
@@ -248,8 +261,9 @@ public:
         asset balance;
         asset requiredBalance;
 
-        asset ramFromDapp = asset(0'0000, S_SYS);
-        asset ramFromGlobalFund = asset(0'0000, S_SYS);
+        symbol coreSymbol = getCoreSymbol();
+        asset ramFromDapp = asset(0'0000, coreSymbol);
+        asset ramFromGlobalFund = asset(0'0000, coreSymbol);
 
         string freeId = "free";
         
@@ -276,7 +290,7 @@ public:
         }
 
         // find the balance of the "memo" account for the origin and check if it has balance >= total balance for RAM, CPU and net - (balance payed by the contributors)
-        if(ramFromPayer > asset(0'0000, S_SYS)){
+        if(ramFromPayer > asset(0'0000, coreSymbol)){
             asset balance = findContribution(origin, name(memo));
             requiredBalance = ramFromPayer + cpu + net;
             // if the "memo" account doesn't have enough fund, check globally available "free" pool
@@ -285,7 +299,7 @@ public:
                 auto dapp = balances.find(toUUID(freeId));
                 freeContributor = (dapp->contributors[0]).contributor;
                 ramFromGlobalFund = findContribution(freeId, name(freeContributor));
-                ramFromPayer = asset(0'0000, S_SYS);
+                ramFromPayer = asset(0'0000, coreSymbol);
                 if(ramFromGlobalFund < requiredBalance){
                     auto msg = "Not enough balance in "+ memo + " or the globally available free fund to pay for account creation.";
                     eosio_assert(false, msg.c_str());
@@ -336,6 +350,8 @@ public:
         uint64_t id = toUUID(dapp);
         auto iterator = balances.find(id);
 
+        symbol coreSymbol = getCoreSymbol();
+        
         auto msg = "No contribution found for " + dapp + " by " + contributor.to_string() + ". Checking the globally available free fund.";
 
         // if no record found for the dapp in the balances table, return the balance for the contributor as 0
@@ -348,26 +364,21 @@ public:
                 return itr->balance;
             } else{
                 print(msg.c_str());
-                return asset(0'0000, S_SYS);
+                return asset(0'0000, coreSymbol);
             }
         } else {
             print(msg.c_str());
-            return asset(0'0000, S_SYS);
+            return asset(0'0000, coreSymbol);
         }
     }
     
     /***
-     * Gets the current RAM cost in EOS for 4096 bytes of RAM.
+     * Returns the symbol of the core token of the chain or the token used to pay for new account creation
      * @return
      */
-    asset getRamCost(){
-        RamInfo ramInfo(name("eosio"), name("eosio").value);
-        auto ramData = ramInfo.find(S_RAM.raw());
-        eosio_assert(ramData != ramInfo.end(), "Could not get RAM info");
-
-        uint64_t base = ramData->base.balance.amount;
-        uint64_t quote = ramData->quote.balance.amount;
-        return asset((((double)quote / base))*4096, S_SYS);
+    symbol getCoreSymbol(){
+        Token token(_self, _self.value);
+        return token.begin()->S_SYS;
     }
 
     void createAccount(name& account, authority& ownerauth, authority& activeauth, asset& ram, asset& net, asset& cpu){
@@ -412,7 +423,7 @@ public:
         Balances balances(_self, _self.value);
         uint64_t payerId = toUUID(memo);
         auto payer = balances.find(payerId);
-        if(payer == balances.end()) return asset(0'0000, S_SYS);
+        if(payer == balances.end()) return asset(0'0000, getCoreSymbol());
         return payer->balance;
     }
 
@@ -494,7 +505,7 @@ public:
     void transfer(const name& from, const name& to, const asset& quantity, string& memo){
         if(to != _self) return;
         if(from == name("eosio.stake")) return;
-        if(quantity.symbol != S_SYS) return;
+        if(quantity.symbol != getCoreSymbol()) return;
         if(memo.length() > 64) return;
         addBalance(from, quantity, memo);
     }
@@ -539,7 +550,7 @@ void apply(uint64_t receiver, uint64_t code, uint64_t action) {
     auto self = receiver;
 
     if( code == self ) switch(action) {
-        EOSIO_DISPATCH_HELPER( createbridge, (clean)(create)(define)(whitelist)(reclaim))
+        EOSIO_DISPATCH_HELPER( createbridge, (set)(clean)(create)(define)(whitelist)(reclaim))
     }
 
     else {
