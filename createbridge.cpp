@@ -301,7 +301,7 @@ public:
                 ramFromGlobalFund = findContribution(freeId, name(freeContributor));
                 ramFromPayer = asset(0'0000, coreSymbol);
                 if(ramFromGlobalFund < requiredBalance){
-                    auto msg = "Not enough balance in "+ memo + " or the globally available free fund to pay for account creation.";
+                    auto msg = "Not enough balance in " + memo + " or donated by the contributors for " + origin + " to pay for account creation.";
                     eosio_assert(false, msg.c_str());
                 }
             }
@@ -351,7 +351,7 @@ public:
         auto iterator = balances.find(id);
 
         symbol coreSymbol = getCoreSymbol();
-        
+
         auto msg = "No contribution found for " + dapp + " by " + contributor.to_string() + ". Checking the globally available free fund.";
 
         // if no record found for the dapp in the balances table, return the balance for the contributor as 0
