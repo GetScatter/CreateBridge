@@ -29,6 +29,7 @@ namespace common {
 
     struct [[eosio::table, eosio::contract("createbridge")]] token {
         symbol S_SYS;
+        name   newaccountcontract;
         uint64_t primary_key()const { return S_SYS.raw(); }
     };
 

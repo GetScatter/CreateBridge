@@ -42,13 +42,15 @@ public:
 
     /***
      * Specify the core token of the chain or the token used to pay for new user accounts of the chain  
+     * Also specify the contract to call for new account action 
     */
-    ACTION set(const symbol& symbol){
+    ACTION set(const symbol& symbol, name newAccountContract){
         require_auth(_self);
         Token token(_self, _self.value);
         auto iterator = token.find(symbol.raw());
         if(iterator == token.end())token.emplace(_self, [&](auto& row){
             row.S_SYS = symbol;
+            row.newaccountcontract = newAccountContract;
 
         }); else {
             eosio_assert(false, "the core symbol of the chain has already been defined.");
@@ -66,7 +68,7 @@ public:
      * airdroplimit:    token amount to be airdropped to new users for the dapp
      * Only the owner account/whitelisted account will be able to create new user account for the dapp
      */ 
-    ACTION define(name& owner, string dapp, asset ram, asset net, asset cpu, name airdropcontract, asset airdroptokens, asset airdroplimit) {
+    ACTION define(name& owner, string dapp, asset ram, asset net, asset cpu, name airdropContract, asset airdropTokens, asset airdropLimit) {
         require_auth(owner);
         Registry dapps(_self, _self.value);
         auto iterator = dapps.find(toUUID(dapp));
@@ -76,18 +78,18 @@ public:
             row.ram = ram;
             row.net = net;
             row.cpu = cpu;
-            row.airdropcontract = airdropcontract;
-            row.airdroptokens = airdroptokens;
-            row.airdroplimit = airdroplimit;
+            row.airdropcontract = airdropContract;
+            row.airdroptokens = airdropTokens;
+            row.airdroplimit = airdropLimit;
         }); else if (iterator != dapps.end() && iterator->owner == owner)
             // allow the dapp to modify the stats for new user account
             dapps.modify(iterator, same_payer, [&](auto& row){
             row.ram = ram;
             row.net = net;
             row.cpu = cpu;
-            row.airdropcontract = airdropcontract;
-            row.airdroptokens = airdroptokens;
-            row.airdroplimit = airdroplimit;
+            row.airdropcontract = airdropContract;
+            row.airdroptokens = airdropTokens;
+            row.airdroplimit = airdropLimit;
         }); else{
             auto msg = "the dapp " + dapp + " is already registered by another account";
             eosio_assert(false, msg.c_str());
@@ -327,6 +329,16 @@ public:
         airdrop(origin, account);
     }
 
+    /**
+     * Randomly select the contributors for a dapp
+     */
+    void getContributors(uint64_t originId){
+        Balances balances(_self, originId);
+        // print(balances[0]);
+        auto iterator = balances.find(originId);
+        print(iterator->origin);
+    }
+
     /***
      * Checks if an account is whitelisted for a dapp by the owner of the dapp
      * @return
@@ -381,6 +393,14 @@ public:
         return token.begin()->S_SYS;
     }
 
+    /***
+     * Returns the contract name for new account action
+     */ 
+    name getNewAccountContract(){
+        Token token(_self, _self.value);
+        return token.begin()->newaccountcontract;
+    }
+
     void createAccount(name& account, authority& ownerauth, authority& activeauth, asset& ram, asset& net, asset& cpu){
         // FIX it to delegate from createbridge, instead of buying and staking from the new account created
         newaccount new_account = newaccount{
@@ -390,23 +410,25 @@ public:
             .active = activeauth
         };
 
+        name newAccountContract = getNewAccountContract();
+
         action(
             permission_level{ _self, "active"_n },
-            name("eosio"),
+            newAccountContract,
             name("newaccount"),
             new_account
         ).send();
 
         action(
             permission_level{ _self, "active"_n },
-            name("eosio"),
+            newAccountContract,
             name("buyram"),
             make_tuple(_self, account, ram)
         ).send();
 
         action(
             permission_level{ _self, "active"_n },
-            name("eosio"),
+            newAccountContract,
             name("delegatebw"),
             make_tuple(_self, account, net, cpu, true)
         ).send();
@@ -444,7 +466,6 @@ public:
 
         Balances balances(_self, _self.value);
         auto iterator = balances.find(id);
-
         if(iterator == balances.end()) balances.emplace(_self, [&](auto& row){
             row.memo = id;
             row.contributors.push_back({from, quantity, ram});
