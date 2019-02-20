@@ -7,26 +7,26 @@
 #include "models/balances.h"
 #include "models/registry.h"
     
-class contributor_balances {
+class contributions {
 
 public:
 
-    name createbridge = name("createbridge");
+    name createbridge = common::createbridge;
 
     /*
      * Returns the total balance contributed for a dapp
-    */
+     */
     asset balanceFor(string& memo){
         balances::Balances balances(createbridge, createbridge.value);
         uint64_t payerId = common::toUUID(memo);
         auto payer = balances.find(payerId);
-        if(payer == balances.end()) return asset(0'0000, common::getCoreSymbol(name("createbridge")));
+        if(payer == balances.end()) return asset(0'0000, common::getCoreSymbol());
         return payer->balance;
     }
 
     /*
      * Checks whether the balance for an account is greater than the required balance
-    */
+     */
     bool hasBalance(string memo, const asset& quantity){
         return balanceFor(memo).amount > quantity.amount;
     }
@@ -34,7 +34,7 @@ public:
     /*
      * Adds the amount contributed by the contributor for an app to the balances table
      * Called by the internal transfer function 
-    */
+     */
     void addBalance(const name& from, const asset& quantity, string& memo){
         int ram;
         int totalaccounts;
@@ -83,7 +83,7 @@ public:
     /*
      * Subtracts the amount used to create an account from the total amount contributed by a contributor for an app
      * Called by the create action
-    */
+     */
     void subBalance(string memo, string& origin, const asset& quantity){
         uint64_t id = common::toUUID(origin);
 
@@ -111,5 +111,36 @@ public:
                 eosio_assert(false, msg.c_str());
             }
         });
+    }
+
+    /***
+     * Gets the balance of a contributor for a dapp
+     * @return
+     */
+    asset findContribution(string dapp, name contributor){
+        balances::Balances balances(createbridge, createbridge.value);
+        uint64_t id = common::toUUID(dapp);
+        auto iterator = balances.find(id);
+
+        symbol coreSymbol = common::getCoreSymbol();
+
+        auto msg = "No contribution found for " + dapp + " by " + contributor.to_string() + ". Checking the globally available free fund.";
+
+        // if no record found for the dapp in the balances table, return the balance for the contributor as 0
+        if(iterator != balances.end()){
+            auto pred = [contributor](const balances::contributors & item) {
+                    return item.contributor == contributor;
+            };
+            auto itr = std::find_if(std::begin(iterator->contributors), std::end(iterator->contributors), pred);  
+            if(itr != std::end(iterator->contributors)){
+                return itr->balance;
+            } else{
+                print(msg.c_str());
+                return asset(0'0000, coreSymbol);
+            }
+        } else {
+            print(msg.c_str());
+            return asset(0'0000, coreSymbol);
+        }
     }
 };
