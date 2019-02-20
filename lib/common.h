@@ -12,6 +12,7 @@ using std::vector;
 
 namespace common {
     static const symbol S_RAM = symbol("RAMCORE", 4);
+    static const name createbridge = name("createbridge");
 
     inline static uint64_t toUUID(string username){
         return std::hash<string>{}(username);
@@ -39,8 +40,16 @@ namespace common {
      * Returns the symbol of the core token of the chain or the token used to pay for new account creation
      * @return
      */
-    symbol getCoreSymbol(name account){
-        Token token(account, account.value);
+    symbol getCoreSymbol(){
+        Token token(createbridge, createbridge.value);
         return token.begin()->S_SYS;
+    }
+
+    /***
+     * Returns the contract name for new account action
+     */ 
+    name getNewAccountContract(){
+        Token token(createbridge, createbridge.value);
+        return token.begin()->newaccountcontract;
     }
 };
