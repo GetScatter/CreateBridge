@@ -3,10 +3,13 @@
 #include <eosiolib/action.hpp>
 
 #include "lib/common.h"
+
 #include "models/accounts.h"
 #include "models/balances.h"
 #include "models/registry.h"
-#include "balances.cpp"
+
+#include "contributions.cpp"
+#include "airdrops.cpp"
 
 using namespace eosio;
 using namespace common;
@@ -15,7 +18,7 @@ using namespace registry;
 using namespace balances;
 using namespace std;
 
-CONTRACT createbridge : contract, public contributor_balances{
+CONTRACT createbridge : contract, public contributions, public airdrops{
 public:
     using contract::contract;
     createbridge(name receiver, name code,  datastream<const char*> ds):contract(receiver, code, ds) {}
@@ -57,6 +60,7 @@ public:
             eosio_assert(false, "the core symbol of the chain has already been defined.");
         }      
     }
+
     /***
      * Called to define an account name as the owner of a dapp along with the following details:
      * owner:           account name to be registered as the owner of the dapp 
@@ -354,54 +358,6 @@ public:
         return false;
     }
 
-    /***
-     * Gets the balance of a contributor for a dapp
-     * @return
-     */
-    asset findContribution(string dapp, name contributor){
-        Balances balances(_self, _self.value);
-        uint64_t id = toUUID(dapp);
-        auto iterator = balances.find(id);
-
-        symbol coreSymbol = getCoreSymbol();
-
-        auto msg = "No contribution found for " + dapp + " by " + contributor.to_string() + ". Checking the globally available free fund.";
-
-        // if no record found for the dapp in the balances table, return the balance for the contributor as 0
-        if(iterator != balances.end()){
-            auto pred = [contributor](const contributors & item) {
-                    return item.contributor == contributor;
-            };
-            auto itr = std::find_if(std::begin(iterator->contributors), std::end(iterator->contributors), pred);  
-            if(itr != std::end(iterator->contributors)){
-                return itr->balance;
-            } else{
-                print(msg.c_str());
-                return asset(0'0000, coreSymbol);
-            }
-        } else {
-            print(msg.c_str());
-            return asset(0'0000, coreSymbol);
-        }
-    }
-    
-    /***
-     * Returns the symbol of the core token of the chain or the token used to pay for new account creation
-     * @return
-     */
-    symbol getCoreSymbol(){
-        Token token(_self, _self.value);
-        return token.begin()->S_SYS;
-    }
-
-    /***
-     * Returns the contract name for new account action
-     */ 
-    name getNewAccountContract(){
-        Token token(_self, _self.value);
-        return token.begin()->newaccountcontract;
-    }
-
     void createAccount(name& account, authority& ownerauth, authority& activeauth, asset& ram, asset& net, asset& cpu){
         // FIX it to delegate from createbridge, instead of buying and staking from the new account created
         newaccount new_account = newaccount{
@@ -447,40 +403,6 @@ public:
         if(quantity.symbol != getCoreSymbol()) return;
         if(memo.length() > 64) return;
         addBalance(from, quantity, memo);
-    }
-
-    /**********************************************/
-    /***                                        ***/
-    /***               Airdrops                 ***/
-    /***                                        ***/
-    /**********************************************/
-
-    /*
-    * Called when a new user account is created
-    * Transfers the dapp tokens to the new account created
-    */
-    void airdrop(string dapp, name account){
-        Registry dapps(_self, _self.value);
-        auto iterator = dapps.find(toUUID(dapp));
-        if(iterator != dapps.end())dapps.modify(iterator, same_payer, [&](auto& row){
-            // check if the dapp has opted for airdrop
-            if(row.airdropcontract != name("")){
-                if(row.airdroptokens.amount > 0){
-                    asset tokens = row.airdroplimit;
-                    auto memo = "airdrop " + tokens.to_string() + " to " + account.to_string();
-                    action(
-                        permission_level{ _self, "active"_n },
-                        row.airdropcontract,
-                        name("transfer"),
-                        make_tuple(_self, account, tokens, memo)
-                    ).send();
-                    row.airdroptokens -= tokens;
-                } else {
-                    auto msg = "Not enough " + row.airdroptokens.symbol.code().to_string() + " with createbridge to airdrop.";
-                    eosio_assert(false,msg.c_str());
-                }
-            }
-        });   
     }
 };
 
