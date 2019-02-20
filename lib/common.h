@@ -34,4 +34,13 @@ namespace common {
     };
 
     typedef eosio::multi_index<"token"_n, token> Token;
+
+    /***
+     * Returns the symbol of the core token of the chain or the token used to pay for new account creation
+     * @return
+     */
+    symbol getCoreSymbol(name account){
+        Token token(account, account.value);
+        return token.begin()->S_SYS;
+    }
 };

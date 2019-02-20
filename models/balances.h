@@ -6,6 +6,8 @@ namespace balances {
         name contributor;
         asset balance;
         int ram;   // percentage of ram cost the contributor wants to fund
+        int totalaccounts; // specify the limit for the number of accounts to be created by the given contribution 
+        int createdaccounts; // number of accounts created using the contributor's funds
     };
 
     struct [[eosio::table, eosio::contract("createbridge")]] balances {

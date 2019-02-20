@@ -6,6 +6,7 @@
 #include "models/accounts.h"
 #include "models/balances.h"
 #include "models/registry.h"
+#include "balances.cpp"
 
 using namespace eosio;
 using namespace common;
@@ -14,7 +15,7 @@ using namespace registry;
 using namespace balances;
 using namespace std;
 
-CONTRACT createbridge : contract {
+CONTRACT createbridge : contract, public contributor_balances{
 public:
     using contract::contract;
     createbridge(name receiver, name code,  datastream<const char*> ds):contract(receiver, code, ds) {}
@@ -432,89 +433,6 @@ public:
             name("delegatebw"),
             make_tuple(_self, account, net, cpu, true)
         ).send();
-    }
-
-
-    /**********************************************/
-    /***                                        ***/
-    /***                Balances                ***/
-    /***                                        ***/
-    /**********************************************/
-
-    asset balanceFor(string& memo){
-        Balances balances(_self, _self.value);
-        uint64_t payerId = toUUID(memo);
-        auto payer = balances.find(payerId);
-        if(payer == balances.end()) return asset(0'0000, getCoreSymbol());
-        return payer->balance;
-    }
-
-    bool hasBalance(string memo, const asset& quantity){
-        return balanceFor(memo).amount > quantity.amount;
-    }
-
-    void addBalance(const name& from, const asset& quantity, string& memo){
-        int ram;
-        vector<string> stats = common::split(memo, ',');
-        uint64_t id = toUUID(stats[0]);
-
-        if(stats[0] != "free"){
-            ram = stoi(stats[1]);
-        } else {
-            ram = 100;
-        }
-
-        Balances balances(_self, _self.value);
-        auto iterator = balances.find(id);
-        if(iterator == balances.end()) balances.emplace(_self, [&](auto& row){
-            row.memo = id;
-            row.contributors.push_back({from, quantity, ram});
-            row.balance = quantity;
-            row.origin = stats[0];
-            row.timestamp = now();
-        });
-        else balances.modify(iterator, same_payer, [&](auto& row){
-            auto pred = [from](const contributors & item) {
-                return item.contributor == from;
-            };
-            std::vector<contributors>::iterator itr = std::find_if(std::begin(row.contributors), std::end(row.contributors), pred);    
-            if(itr != std::end(row.contributors)){
-                itr->balance += quantity;
-                itr->ram = ram;
-            } else {
-                row.contributors.push_back({from, quantity, ram});
-                row.timestamp = now();
-            }
-            row.balance += quantity;
-        });
-    }
-
-    void subBalance(string memo, string& origin, const asset& quantity){
-        uint64_t id = toUUID(origin);
-
-        Balances balances(_self, _self.value);
-        auto iterator = balances.find(id);
-
-        eosio_assert(iterator != balances.end(), "No balance object");
-        eosio_assert(iterator->balance.amount >= quantity.amount, "overdrawn balance" );
-
-        if(iterator->balance.amount - quantity.amount <= 0){
-            balances.erase(iterator);
-        }
-
-        else balances.modify(iterator, same_payer, [&](auto& row){
-            auto pred = [memo](const contributors & item) {
-                return item.contributor == name(memo);
-            };
-            auto itr = std::find_if(std::begin(row.contributors), std::end(row.contributors), pred);    
-            if(itr != std::end(row.contributors)){
-                row.balance -= quantity;
-                itr->balance -= quantity;
-            } else {
-                auto msg = "The account " + memo + "not found as one of the contributors for " + origin; 
-                eosio_assert(false, msg.c_str());
-            }
-        });
     }
 
     /**********************************************/
