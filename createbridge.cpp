@@ -8,8 +8,7 @@
 #include "models/balances.h"
 #include "models/registry.h"
 
-#include "contributions.cpp"
-#include "airdrops.cpp"
+#include "newaccounts.cpp"
 
 using namespace eosio;
 using namespace common;
@@ -18,7 +17,7 @@ using namespace registry;
 using namespace balances;
 using namespace std;
 
-CONTRACT createbridge : contract, public contributions, public airdrops{
+CONTRACT createbridge : contract, public newaccounts{
 public:
     using contract::contract;
     createbridge(name receiver, name code,  datastream<const char*> ds):contract(receiver, code, ds) {}
@@ -251,144 +250,6 @@ public:
                 }
             });  
         }
-    }
-
-    /**********************************************/
-    /***                                        ***/
-    /***                Helpers                 ***/
-    /***                                        ***/
-    /**********************************************/
-
-    void createJointAccount(string& memo, name& account, string& origin, authority& ownerAuth, authority& activeAuth){
-        // memo is the account that pays the remaining balance i.e
-        // balance needed for new account creation - (balance contributed by the contributors)
-        name contributor;
-        name freeContributor;
-
-        asset balance;
-        asset requiredBalance;
-
-        symbol coreSymbol = getCoreSymbol();
-        asset ramFromDapp = asset(0'0000, coreSymbol);
-        asset ramFromGlobalFund = asset(0'0000, coreSymbol);
-
-        string freeId = "free";
-        
-        Balances balances(_self, _self.value);
-        Registry dapps(_self, _self.value);
-        
-        // gets the ram, net and cpu requirements for the new user accounts from the dapp registry
-        auto iterator = dapps.find(toUUID(origin));
-        asset ram = iterator->ram;
-        asset ramFromPayer = ram;
-        asset net = iterator->net;
-        asset cpu = iterator->cpu;
-
-        if(memo != origin && hasBalance(origin, ram)){
-            uint64_t originId = toUUID(origin);
-            auto dapp = balances.find(originId);
-
-            if(dapp != balances.end()){
-                // TODO: call the "find the contributor" logic here for origin as dapp identifier. For ex - everipedia.org
-                contributor = (dapp->contributors[0]).contributor;
-                ramFromDapp = (dapp->contributors[0].ram * ram)/100;
-                ramFromPayer -= ramFromDapp;
-            }
-        }
-
-        // find the balance of the "memo" account for the origin and check if it has balance >= total balance for RAM, CPU and net - (balance payed by the contributors)
-        if(ramFromPayer > asset(0'0000, coreSymbol)){
-            asset balance = findContribution(origin, name(memo));
-            requiredBalance = ramFromPayer + cpu + net;
-            // if the "memo" account doesn't have enough fund, check globally available "free" pool
-            if(balance < requiredBalance){
-                // TODO: call the "find the contributor" logic here for origin "free"
-                auto dapp = balances.find(toUUID(freeId));
-                freeContributor = (dapp->contributors[0]).contributor;
-                ramFromGlobalFund = findContribution(freeId, name(freeContributor));
-                ramFromPayer = asset(0'0000, coreSymbol);
-                if(ramFromGlobalFund < requiredBalance){
-                    auto msg = "Not enough balance in " + memo + " or donated by the contributors for " + origin + " to pay for account creation.";
-                    eosio_assert(false, msg.c_str());
-                }
-            }
-        }
-
-        createAccount(account, ownerAuth, activeAuth, ram, net, cpu);
-
-        // subtract the used balance 
-        if(ramFromPayer.amount > 0)
-        {
-            subBalance(memo, origin, requiredBalance);
-        }
-
-        if(ramFromDapp.amount > 0){
-            subBalance(contributor.to_string(), origin, ramFromDapp);
-        }
-
-        if(ramFromGlobalFund.amount > 0){
-            subBalance(freeContributor.to_string(), freeId, requiredBalance);
-        }
-        
-        // airdrop dapp tokens if requested
-        airdrop(origin, account);
-    }
-
-    /**
-     * Randomly select the contributors for a dapp
-     */
-    void getContributors(uint64_t originId){
-        Balances balances(_self, originId);
-        // print(balances[0]);
-        auto iterator = balances.find(originId);
-        print(iterator->origin);
-    }
-
-    /***
-     * Checks if an account is whitelisted for a dapp by the owner of the dapp
-     * @return
-     */
-    bool checkIfWhitelisted(name account, string dapp){
-        Registry dapps(_self, _self.value);
-        auto iterator = dapps.find(toUUID(dapp));
-        auto position_in_whitelist = std::find(iterator->whitelisted_accounts.begin(), iterator->whitelisted_accounts.end(), account); 
-        if(position_in_whitelist != iterator->whitelisted_accounts.end()){
-            return true;
-        }
-        return false;
-    }
-
-    void createAccount(name& account, authority& ownerauth, authority& activeauth, asset& ram, asset& net, asset& cpu){
-        // FIX it to delegate from createbridge, instead of buying and staking from the new account created
-        newaccount new_account = newaccount{
-            .creator = _self,
-            .name = account,
-            .owner = ownerauth,
-            .active = activeauth
-        };
-
-        name newAccountContract = getNewAccountContract();
-
-        action(
-            permission_level{ _self, "active"_n },
-            newAccountContract,
-            name("newaccount"),
-            new_account
-        ).send();
-
-        action(
-            permission_level{ _self, "active"_n },
-            newAccountContract,
-            name("buyram"),
-            make_tuple(_self, account, ram)
-        ).send();
-
-        action(
-            permission_level{ _self, "active"_n },
-            newAccountContract,
-            name("delegatebw"),
-            make_tuple(_self, account, net, cpu, true)
-        ).send();
     }
 
     /**********************************************/
