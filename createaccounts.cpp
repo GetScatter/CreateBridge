@@ -12,7 +12,7 @@
 using namespace eosio;
 using namespace std;
 
-class newaccounts : public contributions, public airdrops{
+class createaccounts : public contributions, public airdrops{
 
 public:
     name createbridge = common::createbridge;

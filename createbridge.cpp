@@ -8,7 +8,7 @@
 #include "models/balances.h"
 #include "models/registry.h"
 
-#include "newaccounts.cpp"
+#include "createaccounts.cpp"
 
 using namespace eosio;
 using namespace common;
@@ -17,7 +17,7 @@ using namespace registry;
 using namespace balances;
 using namespace std;
 
-CONTRACT createbridge : contract, public newaccounts{
+CONTRACT createbridge : contract, public createaccounts{
 public:
     using contract::contract;
     createbridge(name receiver, name code,  datastream<const char*> ds):contract(receiver, code, ds) {}
