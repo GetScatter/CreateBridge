@@ -1,12 +1,18 @@
 #include <eosiolib/eosio.hpp>
 #include <eosiolib/print.hpp>
 #include <eosiolib/action.hpp>
+#include <eosiolib/crypto.h>
+#include <algorithm> 
+#include <cstdlib>
 
 #include "lib/common.h"
+
 #include "models/accounts.h"
 #include "models/balances.h"
 #include "models/registry.h"
     
+using namespace eosio;
+using namespace std;
 class contributions {
 
 public:
@@ -143,4 +149,18 @@ public:
             return asset(0'0000, coreSymbol);
         }
     }
+
+    /**
+     * Randomly select the contributors for a dapp
+     */
+    uint64_t getContributors(uint64_t seed, uint64_t to){
+        const uint64_t a = 1103515245;
+        const uint64_t c = 12345;
+
+        seed = (uint64_t)((a * seed + c) % 0x7fffffff);
+        uint64_t value = ((uint64_t)seed * to) >> 31;
+
+        return value;
+    }
+
 };
