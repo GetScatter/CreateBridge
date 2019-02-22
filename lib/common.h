@@ -28,6 +28,19 @@ namespace common {
         return elems;
     }
 
+    uint64_t generate_random(uint64_t seed, uint64_t val){
+        const uint64_t a = 1103515245;
+        const uint64_t c = 12345;
+
+        // using LCG alogrithm : https://en.wikipedia.org/wiki/Linear_congruential_generator
+        // used by standard c++ rand function : http://pubs.opengroup.org/onlinepubs/009695399/functions/rand.html
+
+        uint64_t seed2 = (uint32_t)((a * seed + c) % 0x7fffffff);        
+        uint64_t value = ((uint64_t)seed2 * val) >> 31;
+
+        return value;
+    }
+
     struct [[eosio::table, eosio::contract("createbridge")]] token {
         symbol S_SYS;
         name   newaccountcontract;

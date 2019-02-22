@@ -153,14 +153,27 @@ public:
     /**
      * Randomly select the contributors for a dapp
      */
-    uint64_t getContributors(uint64_t seed, uint64_t to){
-        const uint64_t a = 1103515245;
-        const uint64_t c = 12345;
+    vector<balances::contributors> getContributors(string originId, uint64_t seed, uint64_t to){
+        balances::Balances balances(createbridge, createbridge.value);
+        auto iterator = balances.find(common::toUUID(originId));
 
-        seed = (uint64_t)((a * seed + c) % 0x7fffffff);
-        uint64_t value = ((uint64_t)seed * to) >> 31;
+        vector<balances::contributors> initial_contributors = iterator->contributors; 
+        vector<balances::contributors> final_contributors;
 
-        return value;
+        // generate a random number with new account name as the seed
+        uint64_t number = common::generate_random(seed, to);
+
+        int size = initial_contributors.size();
+
+        // get the index from the contributors corresponding to individual digits of the random number generated in the above step
+        while(size > 0 && number > 0){
+            int digit = number % 10;
+            // mode the digit of the random number by the initial_contributors to get the randomly generated indices within the size of the vector
+            final_contributors.push_back(initial_contributors[digit % initial_contributors.size()]);
+            number /= 10;
+            size--;
+        }
+        return final_contributors;
     }
 
 };
