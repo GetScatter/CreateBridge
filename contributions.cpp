@@ -150,30 +150,87 @@ public:
         }
     }
 
+    /***
+     * Gets the RAM contribution of a contributor for a dapp
+     * @return
+     */
+    int findRamContribution(string dapp, name contributor){
+        balances::Balances balances(createbridge, createbridge.value);
+        uint64_t id = common::toUUID(dapp);
+        auto iterator = balances.find(id);
+
+        symbol coreSymbol = common::getCoreSymbol();
+
+        auto msg = "No contribution found for " + dapp + " by " + contributor.to_string() + ". Checking the globally available free fund.";
+
+        // if no record found for the dapp in the balances table, return the balance for the contributor as 0
+        if(iterator != balances.end()){
+            auto pred = [contributor](const balances::contributors & item) {
+                    return item.contributor == contributor;
+            };
+            auto itr = std::find_if(std::begin(iterator->contributors), std::end(iterator->contributors), pred);  
+            if(itr != std::end(iterator->contributors)){
+                return itr->ram;
+            } else{
+                print(msg.c_str());
+                return 0;
+            }
+        } else {
+            print(msg.c_str());
+            return 0;
+        }
+    }
+
     /**
      * Randomly select the contributors for a dapp
      */
-    vector<balances::contributors> getContributors(string originId, uint64_t seed, uint64_t to){
+    vector<balances::contributors> getContributors(string origin, uint64_t seed, uint64_t to){
         balances::Balances balances(createbridge, createbridge.value);
-        auto iterator = balances.find(common::toUUID(originId));
+        auto iterator = balances.find(common::toUUID(origin));
 
         vector<balances::contributors> initial_contributors = iterator->contributors; 
         vector<balances::contributors> final_contributors;
+        vector<balances::contributors> chosen_contributors;
 
         // generate a random number with new account name as the seed
         uint64_t number = common::generate_random(seed, to);
-
+        
         int size = initial_contributors.size();
 
         // get the index from the contributors corresponding to individual digits of the random number generated in the above step
         while(size > 0 && number > 0){
             int digit = number % 10;
-            // mode the digit of the random number by the initial_contributors to get the randomly generated indices within the size of the vector
+            // modulus the digit of the random number by the initial_contributors to get the randomly generated indices within the size of the vector
             final_contributors.push_back(initial_contributors[digit % initial_contributors.size()]);
             number /= 10;
             size--;
         }
-        return final_contributors;
+
+        int final_size = final_contributors.size();
+        int i = 0;
+
+        int max_ram_contribution = 100;
+        int total_ram_contribution = 0;
+
+        // choose the contributors to get the total contributions for RAM as close to 100% as possible
+        while(total_ram_contribution < max_ram_contribution && i < final_size){
+            int ram_contribution = findRamContribution(origin, final_contributors[i].contributor);
+            total_ram_contribution += ram_contribution;
+            if(total_ram_contribution > max_ram_contribution){
+                ram_contribution -= (total_ram_contribution - max_ram_contribution);
+            }
+            chosen_contributors.push_back(
+                {
+                    final_contributors[i].contributor,
+                    final_contributors[i].balance,
+                    ram_contribution,
+                    final_contributors[i].totalaccounts,
+                    final_contributors[i].createdaccounts
+                }
+            );
+            i++;
+        }
+        return chosen_contributors;
     }
 
 };
