@@ -10,6 +10,11 @@ namespace balances {
         int createdaccounts; // number of accounts created using the contributor's funds
     };
 
+    struct chosen_contributors {
+        name contributor;
+        asset rampay; // amount the contributor is contributing towards RAM cost for new account 
+    };
+    
     struct [[eosio::table, eosio::contract("createbridge")]] balances {
         uint64_t memo;
         vector<contributors> contributors;

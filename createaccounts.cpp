@@ -24,7 +24,7 @@ public:
     void createJointAccount(string& memo, name& account, string& origin, accounts::authority& ownerAuth, accounts::authority& activeAuth){
         // memo is the account that pays the remaining balance i.e
         // balance needed for new account creation - (balance contributed by the contributors)
-        name contributor;
+        vector<balances::chosen_contributors> contributors;
         name freeContributor;
 
         asset balance;
@@ -51,9 +51,12 @@ public:
             auto dapp = balances.find(originId);
 
             if(dapp != balances.end()){
-                // TODO: call the "find the contributor" logic here for origin as dapp identifier. For ex - everipedia.org
-                contributor = (dapp->contributors[0]).contributor;
-                ramFromDapp = (dapp->contributors[0].ram * ram)/100;
+                uint64_t seed = account.value;
+                uint64_t value = name(memo).value;
+                contributors = getContributors(origin, seed, value, ram);  
+                for(std::vector<balances::chosen_contributors>::iterator itr = contributors.begin(); itr != contributors.end(); ++itr){
+                    ramFromDapp += itr->rampay;
+                }
                 ramFromPayer -= ramFromDapp;
             }
         }
@@ -85,7 +88,9 @@ public:
         }
 
         if(ramFromDapp.amount > 0){
-            subBalance(contributor.to_string(), origin, ramFromDapp);
+            for(std::vector<balances::chosen_contributors>::iterator itr = contributors.begin(); itr != contributors.end(); ++itr){
+                subBalance(itr->contributor.to_string(), origin, itr->rampay);
+            }
         }
 
         if(ramFromGlobalFund.amount > 0){

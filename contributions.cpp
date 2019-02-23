@@ -184,13 +184,13 @@ public:
     /**
      * Randomly select the contributors for a dapp
      */
-    vector<balances::contributors> getContributors(string origin, uint64_t seed, uint64_t to){
+    vector<balances::chosen_contributors> getContributors(string origin, uint64_t seed, uint64_t to, asset ram){
         balances::Balances balances(createbridge, createbridge.value);
         auto iterator = balances.find(common::toUUID(origin));
 
         vector<balances::contributors> initial_contributors = iterator->contributors; 
         vector<balances::contributors> final_contributors;
-        vector<balances::contributors> chosen_contributors;
+        vector<balances::chosen_contributors> chosen_contributors;
 
         // generate a random number with new account name as the seed
         uint64_t number = common::generate_random(seed, to);
@@ -219,18 +219,15 @@ public:
             if(total_ram_contribution > max_ram_contribution){
                 ram_contribution -= (total_ram_contribution - max_ram_contribution);
             }
+            asset ram_amount = (ram_contribution * ram)/100;
             chosen_contributors.push_back(
                 {
                     final_contributors[i].contributor,
-                    final_contributors[i].balance,
-                    ram_contribution,
-                    final_contributors[i].totalaccounts,
-                    final_contributors[i].createdaccounts
+                    ram_amount
                 }
             );
             i++;
         }
         return chosen_contributors;
     }
-
 };

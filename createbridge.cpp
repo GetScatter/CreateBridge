@@ -110,7 +110,9 @@ public:
         auto iterator = dapps.find(toUUID(dapp));
 
         if(iterator != dapps.end() && owner == iterator->owner)dapps.modify(iterator, same_payer, [&](auto& row){
-            row.whitelisted_accounts.push_back(account);
+            if (std::find(row.whitelisted_accounts.begin(), row.whitelisted_accounts.end(), account) == row.whitelisted_accounts.end()){
+                row.whitelisted_accounts.push_back(account);
+            }
         }); else {
             auto msg = "the dapp " + dapp + " is not owned by account " + owner.to_string();
             eosio_assert(false, msg.c_str());
@@ -146,7 +148,7 @@ public:
                 eosio_assert(false, msg.c_str());
             }
         }else {
-            auto msg = "no owner account found for " + memo;
+            auto msg = "no owner account found for " + origin;
             eosio_assert(false, msg.c_str());
         }
 
@@ -168,7 +170,7 @@ public:
 
         string freeId = "free";
 
-        createJointAccount(memo, account, origin, ownerAuth, activeAuth);                               
+        createJointAccount(memo, account, origin, ownerAuth, activeAuth);                      
     }
 
     /***
