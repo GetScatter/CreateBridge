@@ -214,20 +214,25 @@ public:
 
         // choose the contributors to get the total contributions for RAM as close to 100% as possible
         while(total_ram_contribution < max_ram_contribution && i < final_size){
-            int ram_contribution = findRamContribution(origin, final_contributors[i].contributor);
-            total_ram_contribution += ram_contribution;
-            if(total_ram_contribution > max_ram_contribution){
-                ram_contribution -= (total_ram_contribution - max_ram_contribution);
-            }
-            asset ram_amount = (ram_contribution * ram)/100;
-            chosen_contributors.push_back(
+            //check if the total account creation limit has been reached for a contributor
+            if(final_contributors[i].createdaccounts < final_contributors[i].totalaccounts || final_contributors[i].totalaccounts == 0){
+                int ram_contribution = findRamContribution(origin, final_contributors[i].contributor);
+                total_ram_contribution += ram_contribution;
+            
+                if(total_ram_contribution > max_ram_contribution){
+                    ram_contribution -= (total_ram_contribution - max_ram_contribution);
+                }
+                
+                asset ram_amount = (ram_contribution * ram)/100;
+                chosen_contributors.push_back(
                 {
                     final_contributors[i].contributor,
                     ram_amount
-                }
-            );
+                });
+            }
             i++;
         }
         return chosen_contributors;
+
     }
 };
