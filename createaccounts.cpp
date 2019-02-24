@@ -52,11 +52,13 @@ public:
 
             if(dapp != balances.end()){
                 uint64_t seed = account.value;
-                uint64_t value = name(memo).value;
-                contributors = getContributors(origin, seed, value, ram);  
+                uint64_t value = name(memo).value;        
+                contributors = getContributors(origin, seed, value, ram);
+                
                 for(std::vector<balances::chosen_contributors>::iterator itr = contributors.begin(); itr != contributors.end(); ++itr){
                     ramFromDapp += itr->rampay;
                 }
+
                 ramFromPayer -= ramFromDapp;
             }
         }
