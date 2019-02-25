@@ -17,7 +17,7 @@ and the amount to airdrop to every new user account created.
 ### Whitelist other accounts
 
 You can whitelist other accounts, to create account on behalf of your dapp.
--  `cleos push action createbridge whitelist '[YOUR_ACCOUNT,ACCOUNT_NAME,app_name]'`
+-  `cleos push action createbridge whitelist '[YOUR_ACCOUNT,account_name,app_name]'`
 
 ### Partial Costs
 
@@ -31,9 +31,34 @@ You can specify the app you want to contribute to along with the percentage of R
 Anyone can send EOS to this contract with the memo `free` to help fund completely free accounts for new EOS users.
 - `cleos transfer YOUR_ACCOUNT createbridge "10.0000 EOS" "free"`
 
+
+### Reclaim balance
+- As a contributor, you can reclaim your balance at any time.
+- You can specify the token symbol of the balance you want to reclaim:
+    - Native token to reclaim chain symbol balance
+    - Dapp token symbol to reclaim the remaining airdrop balance. Only to be reclaimed by the dapp owner
+- `cleos push action createbridge reclaim '["YOUR_ACCOUNT","app_name","token_symbol"]' -p $CONTRIBUTOR
+
 ### Everyone can help!
 
 Because of the way this contract works, anyone can help fund account creation for your app by simply sending amounts
 to the contract with the app origin inside of the memo.
 - `cleos transfer YOUR_ACCOUNT createbridge "10.0000 EOS" "everipedia.org,50"`
 
+### To get started with createbridge, run the following scripts present inside /scripts:
+- Attach the code level permission to active permission of createbridge
+    ./perms.sh
+
+- Specify the token symbol for the chain and also the contract to call for newaccount action
+    ./set.sh
+
+### To test the code for a sampleapp
+- Define a sampledapp and contributor for it
+    ./define.sh
+    ./contribute.sh
+
+- Create a new user account for the sampleapp
+    ./createaccount.sh
+
+- Reclaim the contributed balance for the sampleapp
+    ./reclaim.sh
