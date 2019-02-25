@@ -25,7 +25,7 @@ $cleos push action createbridge whitelist '["'$DAPP_OWNER'","'$MEMO'","'$ORIGIN'
 $cleos push action everipediaiq transfer '["'$DAPP_OWNER'","createbridge","1000.0000 IQ","transfer"]' -p $DAPP_OWNER
 
 # contributions
-$cleos transfer everipediaiq createbridge "100.0000 SYS" "$ORIGIN,50,100" -p $DAPP_OWNER
+$cleos transfer $DAPP_OWNER createbridge "100.0000 SYS" "$ORIGIN,50,100" -p $DAPP_OWNER
 $cleos transfer $MEMO createbridge "100.0000 SYS" "$ORIGIN,50,100" -p $MEMO
 
 # create account
