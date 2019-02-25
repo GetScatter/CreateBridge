@@ -88,9 +88,10 @@ public:
 
     /*
      * Subtracts the amount used to create an account from the total amount contributed by a contributor for an app
+     * Also checks if the memo account is same as one of the dapp contributors. If yes, then only increases the createdaccount field by 1
      * Called by the create action
      */
-    void subBalance(string memo, string& origin, const asset& quantity){
+    void subBalance(string memo, string& origin, const asset& quantity, bool memoIsDapp = false){
         uint64_t id = common::toUUID(origin);
 
         balances::Balances balances(createbridge, createbridge.value);
@@ -111,7 +112,9 @@ public:
             if(itr != std::end(row.contributors)){
                 row.balance -= quantity;
                 itr->balance -= quantity;
-                itr->createdaccounts += 1;
+                if(!memoIsDapp){
+                    itr->createdaccounts += 1;
+                }
             } else {
                 auto msg = "The account " + memo + "not found as one of the contributors for " + origin; 
                 eosio_assert(false, msg.c_str());
@@ -183,6 +186,11 @@ public:
 
     /**
      * Randomly select the contributors for a dapp
+     * It has following steps:
+     * 1. Generate a random number with the new account name as the seed and the payer account name as the value
+     * 2. Mod the individual digits in the number by the contributors vector size to get all the indices within the vector size
+     * 3. Remove the duplicate indices 
+     * 4. Chooses the contributors which have created accounts < total accounts until the max contribution upto 100% is reached
      */
     vector<balances::chosen_contributors> getContributors(string origin, uint64_t seed, uint64_t to, asset ram){
         balances::Balances balances(createbridge, createbridge.value);
@@ -191,6 +199,7 @@ public:
         vector<balances::contributors> initial_contributors = iterator->contributors; 
         vector<balances::contributors> final_contributors;
         vector<balances::chosen_contributors> chosen_contributors;
+        vector<int> chosen_index;
 
         // generate a random number with new account name as the seed
         uint64_t number = common::generate_random(seed, to);
@@ -200,8 +209,15 @@ public:
         // get the index from the contributors corresponding to individual digits of the random number generated in the above step
         while(size > 0 && number > 0){
             int digit = number % 10;
+
             // modulus the digit of the random number by the initial_contributors to get the randomly generated indices within the size of the vector
-            final_contributors.push_back(initial_contributors[digit % initial_contributors.size()]);
+            int index = digit % initial_contributors.size();
+            
+            // make sure not the same contributor is chosen twice
+            if(std::find(chosen_index.begin(), chosen_index.end(), index) == chosen_index.end()){
+                chosen_index.push_back(index);
+                final_contributors.push_back(initial_contributors[index]);
+            }
             number /= 10;
             size--;
         }
@@ -215,7 +231,8 @@ public:
         // choose the contributors to get the total contributions for RAM as close to 100% as possible
         while(total_ram_contribution < max_ram_contribution && i < final_size){
             //check if the total account creation limit has been reached for a contributor
-            if(final_contributors[i].createdaccounts < final_contributors[i].totalaccounts || final_contributors[i].totalaccounts == 0){
+            if(final_contributors[i].createdaccounts < final_contributors[i].totalaccounts || final_contributors[i].totalaccounts == -1){
+
                 int ram_contribution = findRamContribution(origin, final_contributors[i].contributor);
                 total_ram_contribution += ram_contribution;
             
@@ -224,6 +241,7 @@ public:
                 }
                 
                 asset ram_amount = (ram_contribution * ram)/100;
+
                 chosen_contributors.push_back(
                 {
                     final_contributors[i].contributor,
