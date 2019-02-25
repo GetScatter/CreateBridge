@@ -69,15 +69,8 @@ public:
             requiredBalance = ramFromPayer + cpu + net;
             // if the "memo" account doesn't have enough fund, check globally available "free" pool
             if(balance < requiredBalance){
-                // TODO: call the "find the contributor" logic here for origin "free"
-                auto dapp = balances.find(common::toUUID(freeId));
-                freeContributor = (dapp->contributors[0]).contributor;
-                ramFromGlobalFund = findContribution(freeId, name(freeContributor));
-                ramFromPayer = asset(0'0000, coreSymbol);
-                if(ramFromGlobalFund < requiredBalance){
-                    auto msg = "Not enough balance in " + memo + " or donated by the contributors for " + origin + " to pay for account creation.";
-                    eosio_assert(false, msg.c_str());
-                }
+                auto msg = "Not enough balance in " + memo + " or donated by the contributors for " + origin + " to pay for account creation.";
+                eosio_assert(false, msg.c_str());
             }
         }
 
@@ -91,7 +84,13 @@ public:
 
         if(ramFromDapp.amount > 0){
             for(std::vector<balances::chosen_contributors>::iterator itr = contributors.begin(); itr != contributors.end(); ++itr){
-                subBalance(itr->contributor.to_string(), origin, itr->rampay);
+
+                // check if the memo account and the dapp contributor is the same. If yes, only increament accounts created by 1
+                if(itr->contributor == name{memo} && ramFromPayer.amount > 0){
+                    subBalance(itr->contributor.to_string(), origin, itr->rampay,true);
+                } else {
+                    subBalance(itr->contributor.to_string(), origin, itr->rampay);
+                }
             }
         }
 
