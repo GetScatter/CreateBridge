@@ -73,7 +73,12 @@ public:
      * Only the owner account/whitelisted account will be able to create new user account for the dapp
      */ 
     ACTION define(name& owner, string dapp, asset ram, asset net, asset cpu, name airdropContract, asset airdropTokens, asset airdropLimit) {
-        require_auth(owner);
+        if(dapp != "free"){
+            require_auth(owner);
+        } else {
+            require_auth(_self);
+        }
+
         Registry dapps(_self, _self.value);
         auto iterator = dapps.find(toUUID(dapp));
         if(iterator == dapps.end())dapps.emplace(_self, [&](auto& row){
@@ -135,16 +140,21 @@ public:
         Registry dapps(_self, _self.value);
         
         auto iterator = dapps.find(toUUID(origin));
+        string msg;
 
         // Only owner/whitelisted account for the dapp can create accounts
         if(iterator != dapps.end())
         {
             if(name(memo)== iterator->owner){
                 require_auth(iterator->owner);
-            }else if(checkIfWhitelisted(name(memo), origin)){
+            } else if(checkIfWhitelisted(name(memo), origin)){
                 require_auth(name(memo));
-            } else {
-                auto msg = "only owner or whitelisted accounts can create new user accounts for " + origin;
+            } else if(origin == "free"){
+                msg = "using globally available free funds to create account";
+                print(msg.c_str());
+            }
+            else {
+                msg = "only owner or whitelisted accounts can create new user accounts for " + origin;
                 eosio_assert(false, msg.c_str());
             }
         }else {
@@ -167,8 +177,6 @@ public:
                 .accounts = {},
                 .waits = {}
         };
-
-        string freeId = "free";
 
         createJointAccount(memo, account, origin, ownerAuth, activeAuth);                      
     }
