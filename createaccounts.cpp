@@ -113,7 +113,6 @@ public:
      * Calls the chain to create a new account
      */ 
     void createAccount(name& account, accounts::authority& ownerauth, accounts::authority& activeauth, asset& ram, asset& net, asset& cpu){
-        // FIX it to delegate from createbridge, instead of buying and staking from the new account created
         accounts::newaccount new_account = accounts::newaccount{
             .creator = createbridge,
             .name = account,
