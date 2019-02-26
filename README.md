@@ -5,7 +5,7 @@ As an app owner, you can define your app with createbridge contract specifying t
 As somebody who wants to contribute towards account creation whether it is the app owner or any other account, you can send the `createbridge` contract funds with the app `origin` and the percentage of RAM you want to subsidize in the memo. These funds will be used to pay for the user account.
 Any contributor can reclaim their remaining balance at any point of time.
 
-👉🏻 **Please see the "Quick Start" for getting started and thorough guide in the docs**
+👉🏻 **Please see the "Quick Start" section for getting started and thorough guide in the docs**
 
 ## Features
 
