@@ -8,8 +8,10 @@ eosnode=http://127.0.0.1:8888
 #cleos
 cleos="cleos -u $eosnode"
 
+CHAIN_SYMBOL=${1:-SYS}
+
 # specify the chain symbol and the contract name to call for new account action 
-$cleos push action createbridge set '["4,SYS","eosio"]' -p createbridge
+$cleos push action createbridge set '["4, '$CHAIN_SYMBOL'","eosio"]' -p createbridge
 
 symbol=$($cleos get table createbridge createbridge token | jq '.rows[].S_SYS')
 echo "$symbol set successfully"
