@@ -64,11 +64,11 @@ to the contract with the app origin inside of the memo.
 
 ### To test the code for a sampleapp
 - Define a sampleapp and contributor for it
-    ./define.sh
-    ./contribute.sh
+    - ./define.sh
+    - ./contribute.sh
 
 - Create a new user account for the sampleapp
-    ./createaccount.sh
+    - ./createaccount.sh
 
 - Reclaim the contributed balance for the sampleapp
-    ./reclaim.sh
+    - ./reclaim.sh
