@@ -47,7 +47,7 @@ Anyone can send EOS to this contract with the memo `free` to help fund completel
 - You can specify the token symbol of the balance you want to reclaim:
     - Native token to reclaim chain symbol balance
     - Dapp token symbol to reclaim the remaining airdrop balance. Only to be reclaimed by the dapp owner
-- `cleos push action createbridge reclaim '["YOUR_ACCOUNT","app_name","token_symbol"]' -p $CONTRIBUTOR
+- `cleos push action createbridge reclaim '["YOUR_ACCOUNT","app_name","token_symbol"]' -p $CONTRIBUTOR`
 
 ### Everyone can help!
 
