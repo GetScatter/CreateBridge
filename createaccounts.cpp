@@ -32,9 +32,6 @@ public:
 
         symbol coreSymbol = common::getCoreSymbol();
         asset ramFromDapp = asset(0'0000, coreSymbol);
-        asset ramFromGlobalFund = asset(0'0000, coreSymbol);
-
-        string freeId = "free";
         
         balances::Balances balances(createbridge, createbridge.value);
         registry::Registry dapps(createbridge, createbridge.value);
@@ -92,10 +89,6 @@ public:
                     subBalance(itr->contributor.to_string(), origin, itr->rampay);
                 }
             }
-        }
-
-        if(ramFromGlobalFund.amount > 0){
-            subBalance(freeContributor.to_string(), freeId, requiredBalance);
         }
         
         // airdrop dapp tokens if requested
