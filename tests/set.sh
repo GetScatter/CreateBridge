@@ -1,7 +1,8 @@
+#!/bin/bash
+
 # eos server node address
+# point to the current chain 
 eosnode=http://127.0.0.1:8888
-# eosnode=https://ore-staging.openrights.exchange:443
-# eosnode=https://ore.openrights.exchange
 
 #NOTE: This script assumes that you have the keys for createbridge account in your unlocked wallet 
 
