@@ -11,25 +11,26 @@ eosnode=http://127.0.0.1:8888
 #cleos
 cleos="cleos -u $eosnode"
 
-NAME=${1:-mydappuser11}
-ORIGIN=${2:-mydapp.org}
-TOKEN_CONTRACT=${3:-mydapptoken1}
-TOKEN_SYMBOL==${3:-DP}
-DAPP_OWNER=${4:-mydappowner1}
-MEMO=${5:-contributor1}
+CHAIN_SYMBOL=${1:-SYS}
+NAME=${2:-mydappuser11}
+ORIGIN=${3:-mydapp.org}
+TOKEN_CONTRACT=${4:-mydapptoken1}
+TOKEN_SYMBOL=${5:-DP}
+DAPP_OWNER=${6:-mydappowner1}
+MEMO=${7:-contributor1}
 
 # app registration
-$cleos push action createbridge define '["'$DAPP_OWNER'","'$ORIGIN'","2.0000 SYS","1.0000 SYS","1.0000 SYS","everipediaiq","1000.0000 IQ","10.0000 IQ"]' -p $DAPP_OWNER
+$cleos push action createbridge define '["'$DAPP_OWNER'","'$ORIGIN'","2.0000 '$CHAIN_SYMBOL'","1.0000 '$CHAIN_SYMBOL'","1.0000 '$CHAIN_SYMBOL'","'$TOKEN_CONTRACT'","1000.0000 '$TOKEN_SYMBOL'","10.0000 '$TOKEN_SYMBOL'"]' -p $DAPP_OWNER
 
 # whitelisting
 $cleos push action createbridge whitelist '["'$DAPP_OWNER'","'$MEMO'","'$ORIGIN'"]' -p $DAPP_OWNER
 
 # transfer airdrop amount
-$cleos push action $TOKEN_CONTRACT transfer '["'$DAPP_OWNER'","createbridge","1000.0000 $TOKEN_SYMBOL","transfer"]' -p $DAPP_OWNER
+$cleos push action $TOKEN_CONTRACT transfer '["'$DAPP_OWNER'","createbridge","1000.0000 '$TOKEN_SYMBOL'","transfer"]' -p $DAPP_OWNER
 
 # contributions
-$cleos transfer $DAPP_OWNER createbridge "100.0000 SYS" "$ORIGIN,50,100" -p $DAPP_OWNER
-$cleos transfer $MEMO createbridge "100.0000 SYS" "$ORIGIN,50,100" -p $MEMO
+$cleos transfer $DAPP_OWNER createbridge "100.0000 $CHAIN_SYMBOL" "$ORIGIN,50,100" -p $DAPP_OWNER
+$cleos transfer $MEMO createbridge "100.0000 $CHAIN_SYMBOL" "$ORIGIN,50,100" -p $MEMO
 
 # create account
 $cleos push action createbridge create '["'$MEMO'","'$NAME'","EOS4xJvy2tYU21reKbbq4RPLxgzxNmrLtidVWpio5Ggwisfkgzg2L","EOS4xJvy2tYU21reKbbq4RPLxgzxNmrLtidVWpio5Ggwisfkgzg2L","'$ORIGIN'"]' -p $MEMO

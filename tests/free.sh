@@ -18,7 +18,7 @@ CREATOR=${5:-mydappowner1}
 
 $cleos push action createbridge define '["","free","2.0000 SYS","1.0000 SYS","1.0000 SYS","","0.0000 SYS","0.0000 SYS"]' -p createbridge@active
 
-$cleos transfer eosio createbridge "10.0000 SYS" "free" -p $CONTRIBUTOR
+$cleos transfer $CONTRIBUTOR createbridge "10.0000 SYS" "free" -p $CONTRIBUTOR
 
 $cleos push action createbridge create '["'$MEMO'", "'$NAME'", "EOS4xJvy2tYU21reKbbq4RPLxgzxNmrLtidVWpio5Ggwisfkgzg2L","EOS4xJvy2tYU21reKbbq4RPLxgzxNmrLtidVWpio5Ggwisfkgzg2L", "'$ORIGIN'"]' -p $CREATOR
 
