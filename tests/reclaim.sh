@@ -9,9 +9,9 @@ eosnode=http://127.0.0.1:8888
 #cleos
 cleos="cleos -u $eosnode"
 
-ORIGIN=${2:-mydapp.org}
-CONTRIBUTOR=${3:-contributor1}
-CHAIN_SYMBOL=${4:-SYS}
+ORIGIN=${1:-mydapp.org}
+CONTRIBUTOR=${2:-contributor1}
+CHAIN_SYMBOL=${3:-SYS}
 
 # contributions
 $cleos transfer $CONTRIBUTOR createbridge "5.0000 $CHAIN_SYMBOL" "$ORIGIN,50,100" -p $CONTRIBUTOR

@@ -9,9 +9,9 @@ eosnode=http://127.0.0.1:8888
 #cleos
 cleos="cleos -u $eosnode"
 
-ORIGIN=${2:-mydapp.org}
-DAPP_OWNER=${3:-mydappowner1}
-TOKEN=${4:-DP}
+ORIGIN=${1:-mydapp.org}
+DAPP_OWNER=${2:-mydappowner1}
+TOKEN=${3:-DP}
 
 # reclaim dapp tokens
 $cleos push action createbridge reclaim '["'$DAPP_OWNER'","'$ORIGIN'","'$TOKEN'"]' -p $DAPP_OWNER
