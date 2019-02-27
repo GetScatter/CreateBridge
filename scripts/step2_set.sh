@@ -11,7 +11,7 @@ eosnode=http://127.0.0.1:8888
 #cleos
 cleos="cleos -u $eosnode"
 
-CHAIN_SYMBOL=${1:-SYS}
+CHAIN_SYMBOL=${1:-EOS}
 SYMBOL_PRECISION=${2:-4}
 NEWACCOUNT_CONTRACT=${3:-eosio}
 

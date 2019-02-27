@@ -194,6 +194,7 @@ public:
 
         asset reclaimer_balance;
         bool nocontributor;
+        string msg;
 
         // check if the user is trying to reclaim the system tokens
         if(sym == getCoreSymbol().code().to_string()){
@@ -213,8 +214,8 @@ public:
                         row.contributors.erase(reclaimer_record, row.contributors.end());
                         row.balance -= reclaimer_balance;
                     } else {
-                    auto msg = "no remaining contribution for " + dapp + " by " + reclaimer.to_string();
-                    eosio_assert(false, msg.c_str());
+                        msg = "no remaining contribution for " + dapp + " by " + reclaimer.to_string();
+                        eosio_assert(false, msg.c_str());
                     }   
 
                 nocontributor = row.contributors.empty();
@@ -235,7 +236,7 @@ public:
             ).send();
 
             } else {
-                auto msg = "no funds given by " + reclaimer.to_string() +  " for " + dapp;
+                msg = "no funds given by " + reclaimer.to_string() +  " for " + dapp;
                 eosio_assert(false, msg.c_str());
             } 
 
@@ -247,15 +248,21 @@ public:
             if(iterator != dapps.end())dapps.modify(iterator, same_payer, [&](auto& row){
                 if(row.airdropcontract != name("") && row.airdroptokens.symbol.code().to_string() == sym && row.owner == name(reclaimer)){
                     auto memo = "reimburse the remaining airdrop balance for " + dapp + " to " + reclaimer.to_string();
-                    action(
+                    if(row.airdroptokens != asset(0'0000, row.airdroptokens.symbol)){
+                        action(
                         permission_level{ _self, "active"_n },
                         row.airdropcontract,
                         name("transfer"),
                         make_tuple(_self, reclaimer, row.airdroptokens, memo)
-                    ).send();
-                    row.airdroptokens -= row.airdroptokens;
+                        ).send();
+                        row.airdroptokens -= row.airdroptokens;
+                    } else {
+                        msg = "No remaining airdrop balance for " + dapp + ".";
+                        eosio_assert(false, msg.c_str());
+                    }
+
                 } else {
-                    auto msg = "the remaining airdrop balance for " + dapp + " can only be claimed by its owner/whitelisted account.";
+                    msg = "the remaining airdrop balance for " + dapp + " can only be claimed by its owner/whitelisted account.";
                     eosio_assert(false, msg.c_str());
                 }
             });  

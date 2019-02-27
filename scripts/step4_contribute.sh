@@ -15,9 +15,10 @@ eosnode=http://127.0.0.1:8888
 cleos="cleos -u $eosnode"
 
 ORIGIN=${1:-mydapp.org}
+AMOUNT=${2:-"10.0000 EOS"}
 TOTAL_RAM=${2:-50}
 TOTAL_ACCOUNTS=${3:-100}
 CONTRIBUTOR=${4:-contributor1}
 
 # contribute
-$cleos transfer $CONTRIBUTOR createbridge "100.0000 SYS" "$ORIGIN,$TOTAL_RAM,$TOTAL_ACCOUNTS" -p $CONTRIBUTOR
+$cleos transfer $CONTRIBUTOR createbridge "$AMOUNT" "$ORIGIN,$TOTAL_RAM,$TOTAL_ACCOUNTS" -p $CONTRIBUTOR
