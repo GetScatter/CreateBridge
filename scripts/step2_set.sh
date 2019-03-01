@@ -17,5 +17,5 @@ NEWACCOUNT_CONTRACT=${3:-eosio}
 
 
 # specify the chain symbol and the contract name to call for new account action 
-$cleos push action createbridge set '["'$SYMBOL_PRECISION', '$CHAIN_SYMBOL'","'$NEWACCOUNT_CONTRACT'"]' -p createbridge
+$cleos push action createbridge set '["'$SYMBOL_PRECISION','$CHAIN_SYMBOL'","'$NEWACCOUNT_CONTRACT'"]' -p createbridge
 
