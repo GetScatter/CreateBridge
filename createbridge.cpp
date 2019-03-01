@@ -1,17 +1,23 @@
 #include <eosiolib/eosio.hpp>
+#include <eosiolib/print.hpp>
+#include <eosiolib/action.hpp>
 
 #include "lib/common.h"
+
 #include "models/accounts.h"
 #include "models/balances.h"
+#include "models/registry.h"
+
+#include "createaccounts.cpp"
 
 using namespace eosio;
 using namespace common;
 using namespace accounts;
+using namespace registry;
 using namespace balances;
-
 using namespace std;
 
-CONTRACT createbridge : contract {
+CONTRACT createbridge : contract, public createaccounts{
 public:
     using contract::contract;
     createbridge(name receiver, name code,  datastream<const char*> ds):contract(receiver, code, ds) {}
@@ -37,195 +43,230 @@ public:
     /***                                        ***/
     /**********************************************/
 
-
-    ACTION create(string& memo, name& account, public_key& key, string& origin){
+    /***
+     * Specify the core token of the chain or the token used to pay for new user accounts of the chain  
+     * Also specify the contract to call for new account action 
+    */
+    ACTION set(const symbol& symbol, name newAccountContract){
         require_auth(_self);
+        Token token(_self, _self.value);
+        auto iterator = token.find(symbol.raw());
+        if(iterator == token.end())token.emplace(_self, [&](auto& row){
+            row.S_SYS = symbol;
+            row.newaccountcontract = newAccountContract;
 
-        key_weight k = key_weight{key, 1};
-        authority auth{
+        }); else {
+            eosio_assert(false, "the core symbol of the chain has already been defined.");
+        }      
+    }
+
+    /***
+     * Called to define an account name as the owner of a dapp along with the following details:
+     * owner:           account name to be registered as the owner of the dapp 
+     * dapp:            the string/account name representing the dapp
+     * ram:             ram to put in the new user account created for the dapp
+     * net:             EOS amount to be staked for net
+     * cpu:             EOS amount to be staked for cpu
+     * airdropcontract: dapp token contract
+     * airdroptoken:    the total supply of dapp tokens to be airdropped
+     * airdroplimit:    token amount to be airdropped to new users for the dapp
+     * Only the owner account/whitelisted account will be able to create new user account for the dapp
+     */ 
+    ACTION define(name& owner, string dapp, asset ram, asset net, asset cpu, name airdropContract, asset airdropTokens, asset airdropLimit) {
+        if(dapp != "free"){
+            require_auth(owner);
+        } else {
+            require_auth(_self);
+        }
+
+        Registry dapps(_self, _self.value);
+        auto iterator = dapps.find(toUUID(dapp));
+        if(iterator == dapps.end())dapps.emplace(_self, [&](auto& row){
+            row.owner = owner;
+            row.dapp = dapp;
+            row.ram = ram;
+            row.net = net;
+            row.cpu = cpu;
+            row.airdropcontract = airdropContract;
+            row.airdroptokens = airdropTokens;
+            row.airdroplimit = airdropLimit;
+        }); else if (iterator != dapps.end() && iterator->owner == owner)
+            // allow the dapp to modify the stats for new user account
+            dapps.modify(iterator, same_payer, [&](auto& row){
+            row.ram = ram;
+            row.net = net;
+            row.cpu = cpu;
+            row.airdropcontract = airdropContract;
+            row.airdroptokens = airdropTokens;
+            row.airdroplimit = airdropLimit;
+        }); else{
+            auto msg = "the dapp " + dapp + " is already registered by another account";
+            eosio_assert(false, msg.c_str());
+        };
+    }
+
+    /***
+     * Lets the owner account of the dapp to whitelist other accounts. 
+     */ 
+    ACTION whitelist(name owner, name account, string dapp){
+        require_auth(owner);
+
+        Registry dapps(_self, _self.value);
+        auto iterator = dapps.find(toUUID(dapp));
+
+        if(iterator != dapps.end() && owner == iterator->owner)dapps.modify(iterator, same_payer, [&](auto& row){
+            if (std::find(row.whitelisted_accounts.begin(), row.whitelisted_accounts.end(), account) == row.whitelisted_accounts.end()){
+                row.whitelisted_accounts.push_back(account);
+            }
+        }); else {
+            auto msg = "the dapp " + dapp + " is not owned by account " + owner.to_string();
+            eosio_assert(false, msg.c_str());
+        }
+    }
+
+    /***
+     * Creates a new user account. 
+     * It also airdrops custom dapp tokens to the new user account if a dapp owner has opted for airdrops
+     * memo:                name of the account paying for the balance left after getting the donation from the dapp contributors 
+     * account:             name of the account to be created
+     * ownerkey,activekey:  key pair for the new account  
+     * origin:              the string representing the dapp to create the new user account for. For ex- everipedia.org, lumeos
+     * For new user accounts, it follows the following steps:
+     * 1. Choose a contributor, if any, for the dapp to fund the cost for new account creation
+     * 2. Check if the contributor is funding 100 %. If not, check if the "memo" account has enough to fund the remaining cost of account creation
+     * 3. If not, then check the globally available free fund for the remaining cost of an account creation
+    */
+    ACTION create(string& memo, name& account, public_key& ownerkey, public_key& activekey, string& origin){
+        Registry dapps(_self, _self.value);
+        
+        auto iterator = dapps.find(toUUID(origin));
+        string msg;
+
+        // Only owner/whitelisted account for the dapp can create accounts
+        if(iterator != dapps.end())
+        {
+            if(name(memo)== iterator->owner){
+                require_auth(iterator->owner);
+            } else if(checkIfWhitelisted(name(memo), origin)){
+                require_auth(name(memo));
+            } else if(origin == "free"){
+                msg = "using globally available free funds to create account";
+                print(msg.c_str());
+            }
+            else {
+                msg = "only owner or whitelisted accounts can create new user accounts for " + origin;
+                eosio_assert(false, msg.c_str());
+            }
+        }else {
+            auto msg = "no owner account found for " + origin;
+            eosio_assert(false, msg.c_str());
+        }
+
+        key_weight ok = key_weight{ownerkey, 1};
+        authority ownerAuth{
                 .threshold = 1,
-                .keys = {k},
+                .keys = {ok},
                 .accounts = {},
                 .waits = {}
         };
 
-        asset ram = getRamCost();
-        asset minimumCost = ram + asset(0'5000, S_SYS);
-
-        string freeId = "free";
-        string originFreeId = origin+"::free";
-
-        if(hasBalance(originFreeId, minimumCost)) createFreeAccount(memo, account, auth, ram, originFreeId);
-        else if(hasBalance(freeId, minimumCost))  createFreeAccount(memo, account, auth, ram, freeId);
-        else                                      createJointAccount(memo, account, origin, auth, ram);
-    }
-
-
-
-    /**********************************************/
-    /***                                        ***/
-    /***                Helpers                 ***/
-    /***                                        ***/
-    /**********************************************/
-
-    void createFreeAccount(string& memo, name& account, authority& auth, asset& ram, string& id){
-        createAccount(account, auth, ram, NET, CPU);
-
-        subBalance(id, ram + asset(0'5000, S_SYS));
-
-        if(hasBalance(memo, asset(0'0000, S_SYS))) {
-            asset remainder = balanceFor(memo);
-            action(
-                    permission_level{ _self, "active"_n },
-                    name("eosio.token"),
-                    name("transfer"),
-                    make_tuple(_self, account, remainder, memo)
-            ).send();
-            subBalance(memo, remainder);
-        }
-    }
-
-    void createJointAccount(string& memo, name& account, string& origin, authority& auth, asset& ram){
-        Balances balances(_self, _self.value);
-
-        uint64_t payerId = toUUID(memo);
-        auto payer = balances.find(payerId);
-        eosio_assert(payer != balances.end(), "Could not find balance");
-        asset fromPayer = payer->balance;
-
-        asset ramFromPayer = ram;
-        asset ramFromDapp = asset(0'0000, S_SYS);
-
-        if(memo != origin && hasBalance(origin, ram)){
-            uint64_t originId = toUUID(origin);
-            auto dapp = balances.find(originId);
-
-            if(dapp != balances.end()){
-                ramFromDapp.amount = ram.amount/2;
-                ramFromPayer -= ramFromDapp;
-            }
-        }
-
-        asset requiredBalance = ramFromPayer + CPU + NET;
-
-        if(!hasBalance(memo, requiredBalance)){
-            eosio_assert(false, "Not enough to pay for account.");
-        }
-
-        createAccount(account, auth, ram, NET, CPU);
-
-        subBalance(memo, requiredBalance);
-
-        if(ramFromDapp.amount > 0){
-            subBalance(origin, ramFromDapp);
-        }
-    }
-
-    /***
-     * Gets the current RAM cost in EOS for 4096 bytes of RAM.
-     * @return
-     */
-    asset getRamCost(){
-        RamInfo ramInfo(name("eosio"), name("eosio").value);
-        auto ramData = ramInfo.find(S_RAM.raw());
-        eosio_assert(ramData != ramInfo.end(), "Could not get RAM info");
-
-        uint64_t base = ramData->base.balance.amount;
-        uint64_t quote = ramData->quote.balance.amount;
-        return asset((((double)quote / base))*4096, S_SYS);
-    }
-
-    /***
-     * Creates an account based on passed in values
-     */
-    void createAccount(name& account, authority& auth, asset& ram, asset& net, asset& cpu){
-        newaccount new_account = newaccount{
-            .creator = _self,
-            .name = account,
-            .owner = auth,
-            .active = auth
+        key_weight ak = key_weight{activekey, 1};
+        authority activeAuth{
+                .threshold = 1,
+                .keys = {ak},
+                .accounts = {},
+                .waits = {}
         };
 
-        action(
-            permission_level{ _self, "active"_n },
-            name("eosio"),
-            name("newaccount"),
-            new_account
-        ).send();
-
-        action(
-            permission_level{ _self, "active"_n },
-            name("eosio"),
-            name("buyram"),
-            make_tuple(_self, account, ram)
-        ).send();
-
-        action(
-            permission_level{ _self, "active"_n },
-            name("eosio"),
-            name("delegatebw"),
-            make_tuple(_self, account, net, cpu, true)
-        ).send();
+        createJointAccount(memo, account, origin, ownerAuth, activeAuth);                      
     }
 
+    /***
+     * Transfers the remaining balance of a contributor from createbridge back to the contributor
+     * reclaimer: account trying to reclaim the balance
+     * dapp:      the dapp name for which the account is trying to reclaim the balance
+     * sym:       symbol of the tokens to be reclaimed. It can have value based on the following scenarios:
+     *            - reclaim the "native" token balance used to create accounts. For ex - EOS/SYS
+     *            - reclaim the remaining airdrop token balance used to airdrop dapp tokens to new user accounts. For ex- IQ/LUM
+     */ 
+    ACTION reclaim(name reclaimer, string dapp, string sym){
+        require_auth(reclaimer);
 
+        asset reclaimer_balance;
+        bool nocontributor;
+        string msg;
 
+        // check if the user is trying to reclaim the system tokens
+        if(sym == getCoreSymbol().code().to_string()){
+            Balances balances(_self, _self.value);
 
+            auto iterator = balances.find(common::toUUID(dapp));
 
+            if(iterator != balances.end()){
 
+                balances.modify(iterator, same_payer, [&](auto& row){
+                    auto pred = [reclaimer](const contributors & item) {
+                        return item.contributor == reclaimer;
+                    };
+                    auto reclaimer_record = remove_if(std::begin(row.contributors), std::end(row.contributors), pred);
+                    if(reclaimer_record != row.contributors.end()){
+                        reclaimer_balance = reclaimer_record->balance;
+                        row.contributors.erase(reclaimer_record, row.contributors.end());
+                        row.balance -= reclaimer_balance;
+                    } else {
+                        msg = "no remaining contribution for " + dapp + " by " + reclaimer.to_string();
+                        eosio_assert(false, msg.c_str());
+                    }   
 
+                nocontributor = row.contributors.empty();
+            });
 
-    /**********************************************/
-    /***                                        ***/
-    /***                Balances                ***/
-    /***                                        ***/
-    /**********************************************/
+            // delete the entire balance object if no contributors are there for the dapp
+            if(nocontributor && iterator->balance == asset(0'0000, getCoreSymbol())){
+                    balances.erase(iterator);
+            }
 
-    asset balanceFor(string& memo){
-        Balances balances(_self, _self.value);
-        uint64_t payerId = toUUID(memo);
-        auto payer = balances.find(payerId);
-        if(payer == balances.end()) return asset(0'0000, S_SYS);
-        return payer->balance;
-    }
+            // transfer the remaining balance for the contributor from the createbridge account to contributor's account
+            auto memo = "reimburse the remaining balance to " + reclaimer.to_string();
+            action(
+                permission_level{ _self, "active"_n },
+                name("eosio.token"),
+                name("transfer"),
+                make_tuple(_self, reclaimer, reclaimer_balance, memo)
+            ).send();
 
-    bool hasBalance(string memo, const asset& quantity){
-        return balanceFor(memo).amount > quantity.amount;
-    }
+            } else {
+                msg = "no funds given by " + reclaimer.to_string() +  " for " + dapp;
+                eosio_assert(false, msg.c_str());
+            } 
 
-    void addBalance(const asset& quantity, string& memo){
-        uint64_t id = toUUID(memo);
+        } 
+        // user is trying to reclaim custom dapp tokens
+        else {
+            Registry dapps(_self, _self.value);
+            auto iterator = dapps.find(toUUID(dapp));
+            if(iterator != dapps.end())dapps.modify(iterator, same_payer, [&](auto& row){
+                if(row.airdropcontract != name("") && row.airdroptokens.symbol.code().to_string() == sym && row.owner == name(reclaimer)){
+                    auto memo = "reimburse the remaining airdrop balance for " + dapp + " to " + reclaimer.to_string();
+                    if(row.airdroptokens != asset(0'0000, row.airdroptokens.symbol)){
+                        action(
+                        permission_level{ _self, "active"_n },
+                        row.airdropcontract,
+                        name("transfer"),
+                        make_tuple(_self, reclaimer, row.airdroptokens, memo)
+                        ).send();
+                        row.airdroptokens -= row.airdroptokens;
+                    } else {
+                        msg = "No remaining airdrop balance for " + dapp + ".";
+                        eosio_assert(false, msg.c_str());
+                    }
 
-        Balances balances(_self, _self.value);
-        auto iterator = balances.find(id);
-        if(iterator == balances.end()) balances.emplace(_self, [&](auto& row){
-            row.memo = id;
-            row.balance = quantity;
-            row.origin = memo;
-            row.timestamp = now();
-        });
-        else balances.modify(iterator, same_payer, [&](auto& row){
-            row.balance += quantity;
-            row.timestamp = now();
-        });
-    }
-
-    void subBalance(string& memo, const asset& quantity){
-        uint64_t id = toUUID(memo);
-
-        Balances balances(_self, _self.value);
-        auto iterator = balances.find(id);
-
-        eosio_assert(iterator != balances.end(), "No balance object");
-        eosio_assert(iterator->balance.amount >= quantity.amount, "overdrawn balance" );
-
-        if(iterator->balance.amount - quantity.amount <= 0){
-            balances.erase(iterator);
+                } else {
+                    msg = "the remaining airdrop balance for " + dapp + " can only be claimed by its owner/whitelisted account.";
+                    eosio_assert(false, msg.c_str());
+                }
+            });  
         }
-
-        else balances.modify(iterator, same_payer, [&](auto& row){
-            row.balance -= quantity;
-        });
     }
 
     /**********************************************/
@@ -237,11 +278,10 @@ public:
     void transfer(const name& from, const name& to, const asset& quantity, string& memo){
         if(to != _self) return;
         if(from == name("eosio.stake")) return;
-        if(quantity.symbol != S_SYS) return;
+        if(quantity.symbol != getCoreSymbol()) return;
         if(memo.length() > 64) return;
-        addBalance(quantity, memo);
+        addBalance(from, quantity, memo);
     }
-
 };
 
 extern "C" {
@@ -249,7 +289,7 @@ void apply(uint64_t receiver, uint64_t code, uint64_t action) {
     auto self = receiver;
 
     if( code == self ) switch(action) {
-        EOSIO_DISPATCH_HELPER( createbridge, (clean)(create) )
+        EOSIO_DISPATCH_HELPER( createbridge, (set)(clean)(create)(define)(whitelist)(reclaim))
     }
 
     else {
