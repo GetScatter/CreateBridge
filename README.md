@@ -31,7 +31,7 @@ Taking the lead from the scatter team, we have added some more features:
 - No risk of loosing your contribution. Reclaim remaining balance at any point of time.
 - Easy access to globally available free fund.
 - Selection of multiple contributors to maximise the % of RAM cost subsidized for a new account.
-- Enables user to specify the total number of accounts to subisize for a dapp.
+- Enables user to specify the total number of accounts to subsidize for a dapp.
 
 ### Define your dapp with createbridge
 
