@@ -78,7 +78,7 @@ public:
      * airdropcontract: airdropdata struct/json or null
      * Only the owner account/whitelisted account will be able to create new user account for the dapp
      */ 
-    ACTION define(name& owner, string dapp, asset ram, asset net, asset cpu, std::optional<airdropdata>& airdrop) {
+    ACTION define(name& owner, string dapp, asset ram, asset net, asset cpu, airdropdata& airdrop) {
         require_auth(dapp != "free" ? owner : _self);
 
         auto iterator = dapps.find(toUUID(dapp));

@@ -31,8 +31,8 @@ CUSTODIAN_ACCOUNT=${9:-appcustodian}
 
 # app registration
 AIRDROP_JSON='{"contract":"'$AIRDROP_TOKEN_CONTRACT'", "tokens":"'$AIRDROP_TOKEN_TOTAL'", "limit":"'$AIRDROP_TOKEN_LIMIT'"}'
-#PARAMS_JSON='{"owner":"'$DAPP_OWNER'", "dapp":"'$ORIGIN'", "ram":"'$RAM'", "net":"'$NET'", "cpu":"'$CPU'", "airdrop":'$AIRDROP_JSON'}'
-PARAMS_JSON='{"owner":"'$DAPP_OWNER'", "dapp":"'$ORIGIN'", "ram":"'$RAM'", "net":"'$NET'", "cpu":"'$CPU'", "airdrop":""}'
+PARAMS_JSON='{"owner":"'$DAPP_OWNER'", "dapp":"'$ORIGIN'", "ram":"'$RAM'", "net":"'$NET'", "cpu":"'$CPU'", "airdrop":'$AIRDROP_JSON'}'
+#PARAMS_JSON='{"owner":"'$DAPP_OWNER'", "dapp":"'$ORIGIN'", "ram":"'$RAM'", "net":"'$NET'", "cpu":"'$CPU'", "airdrop":null}'
 cleos push action createbridge define "$PARAMS_JSON" -p $DAPP_OWNER
 
 # whitelist other accounts
