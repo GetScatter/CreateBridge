@@ -2,17 +2,25 @@
 
 namespace registry{
 
+    struct airdropdata {
+        name        contract;
+        asset       tokens;
+        asset       limit;
+    };
+
     struct [[eosio::table, eosio::contract("createbridge")]] registry {
         name owner;
         string dapp;
         asset ram;           
         asset net;           
-        asset cpu;           
-        name airdropcontract;
-        asset airdroptokens;
-        asset airdroplimit; 
-        vector<name> whitelisted_accounts;
+        asset cpu;
+        vector<name> custodians;
+
+        std::optional<airdropdata> airdrop;
+
         uint64_t primary_key() const {return common::toUUID(dapp);}
+
+        EOSLIB_SERIALIZE(registry, (owner)(dapp)(ram)(net)(cpu)(custodians)(airdrop))
     };
 
     typedef eosio::multi_index<"registry"_n, registry> Registry;

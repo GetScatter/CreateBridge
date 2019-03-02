@@ -17,6 +17,32 @@ class createaccounts : public contributions, public airdrops{
 public:
     name createbridge = common::createbridge;
 
+
+    // TODO:!IMPORTANT!
+    // Without fetching minimum RAM requirements from the system contract there's a likelihood that
+    // either account creation will fail, or the residual RAM will not be enough to
+    // cover any basic functionality of an EOSIO chain.
+    // Something like the method below is always required to set a bare minimum for account creation.
+    // It is somewhat problematic that we can't set it as an assert on the `define` method as the relationship
+    // between the price of EOS and RAM is a moving target which might not assert today, but will assert tomorrow
+    // and cause all account creation to fail.
+
+    // Alternatively, perhaps the safest way forward is to remove the RAM config in `define` and always propose a minimum
+    // of 4096 bytes, or even leave in the config definition but have the definition become an added buffer (4096 + RAM_config)
+    // to allow apps/communities to provide extra RAM for new users.
+
+//    asset getRamCost(){
+//        RamInfo ramInfo(name("eosio"), name("eosio").value);
+//        auto ramData = ramInfo.find(S_RAM.raw());
+//        eosio_assert(ramData != ramInfo.end(), "Could not get RAM info");
+//
+//        uint64_t base = ramData->base.balance.amount;
+//        uint64_t quote = ramData->quote.balance.amount;
+//        return asset((((double)quote / base))*4096, S_SYS);
+//    }
+
+
+
     /***
      * Checks if an account is whitelisted for a dapp by the owner of the dapp
      * @return
@@ -102,8 +128,8 @@ public:
     bool checkIfWhitelisted(name account, string dapp){
         registry::Registry dapps(createbridge, createbridge.value);
         auto iterator = dapps.find(common::toUUID(dapp));
-        auto position_in_whitelist = std::find(iterator->whitelisted_accounts.begin(), iterator->whitelisted_accounts.end(), account); 
-        if(position_in_whitelist != iterator->whitelisted_accounts.end()){
+        auto position_in_whitelist = std::find(iterator->custodians.begin(), iterator->custodians.end(), account);
+        if(position_in_whitelist != iterator->custodians.end()){
             return true;
         }
         return false;

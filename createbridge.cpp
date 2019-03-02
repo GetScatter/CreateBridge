@@ -18,9 +18,17 @@ using namespace balances;
 using namespace std;
 
 CONTRACT createbridge : contract, public createaccounts{
+private:
+    Registry dapps;
+    Balances balances;
+    Token token;
+
 public:
     using contract::contract;
-    createbridge(name receiver, name code,  datastream<const char*> ds):contract(receiver, code, ds) {}
+    createbridge(name receiver, name code,  datastream<const char*> ds):contract(receiver, code, ds),
+        dapps(_self, _self.value),
+        balances(_self, _self.value),
+        token(_self, _self.value){}
 
     template <typename T>
     void cleanTable(){
@@ -47,9 +55,9 @@ public:
      * Specify the core token of the chain or the token used to pay for new user accounts of the chain  
      * Also specify the contract to call for new account action 
     */
-    ACTION set(const symbol& symbol, name newAccountContract){
+    ACTION init(const symbol& symbol, name newAccountContract){
         require_auth(_self);
-        Token token(_self, _self.value);
+
         auto iterator = token.find(symbol.raw());
         if(iterator == token.end())token.emplace(_self, [&](auto& row){
             row.S_SYS = symbol;
@@ -67,42 +75,34 @@ public:
      * ram:             ram to put in the new user account created for the dapp
      * net:             EOS amount to be staked for net
      * cpu:             EOS amount to be staked for cpu
-     * airdropcontract: dapp token contract
-     * airdroptoken:    the total supply of dapp tokens to be airdropped
-     * airdroplimit:    token amount to be airdropped to new users for the dapp
+     * airdropcontract: airdropdata struct/json or null
      * Only the owner account/whitelisted account will be able to create new user account for the dapp
      */ 
-    ACTION define(name& owner, string dapp, asset ram, asset net, asset cpu, name airdropContract, asset airdropTokens, asset airdropLimit) {
-        if(dapp != "free"){
-            require_auth(owner);
-        } else {
-            require_auth(_self);
-        }
+    ACTION define(name& owner, string dapp, asset ram, asset net, asset cpu, std::optional<airdropdata>& airdrop) {
+        require_auth(dapp != "free" ? owner : _self);
 
-        Registry dapps(_self, _self.value);
         auto iterator = dapps.find(toUUID(dapp));
-        if(iterator == dapps.end())dapps.emplace(_self, [&](auto& row){
+
+        eosio_assert(iterator == dapps.end() || (iterator != dapps.end() && iterator->owner == owner),
+                ("the dapp " + dapp + " is already registered by another account").c_str());
+
+        // Creating a new dapp reference
+        if(iterator == dapps.end()) dapps.emplace(_self, [&](auto& row){
             row.owner = owner;
             row.dapp = dapp;
             row.ram = ram;
             row.net = net;
             row.cpu = cpu;
-            row.airdropcontract = airdropContract;
-            row.airdroptokens = airdropTokens;
-            row.airdroplimit = airdropLimit;
-        }); else if (iterator != dapps.end() && iterator->owner == owner)
-            // allow the dapp to modify the stats for new user account
-            dapps.modify(iterator, same_payer, [&](auto& row){
+            row.airdrop = airdrop;
+        });
+
+        // Updating an existing dapp reference's configurations
+        else dapps.modify(iterator, same_payer, [&](auto& row){
             row.ram = ram;
             row.net = net;
             row.cpu = cpu;
-            row.airdropcontract = airdropContract;
-            row.airdroptokens = airdropTokens;
-            row.airdroplimit = airdropLimit;
-        }); else{
-            auto msg = "the dapp " + dapp + " is already registered by another account";
-            eosio_assert(false, msg.c_str());
-        };
+            row.airdrop = airdrop;
+        });
     }
 
     /***
@@ -111,17 +111,15 @@ public:
     ACTION whitelist(name owner, name account, string dapp){
         require_auth(owner);
 
-        Registry dapps(_self, _self.value);
         auto iterator = dapps.find(toUUID(dapp));
 
-        if(iterator != dapps.end() && owner == iterator->owner)dapps.modify(iterator, same_payer, [&](auto& row){
-            if (std::find(row.whitelisted_accounts.begin(), row.whitelisted_accounts.end(), account) == row.whitelisted_accounts.end()){
-                row.whitelisted_accounts.push_back(account);
+        if(iterator != dapps.end() && owner == iterator->owner) dapps.modify(iterator, same_payer, [&](auto& row){
+            if (std::find(row.custodians.begin(), row.custodians.end(), account) == row.custodians.end()){
+                row.custodians.push_back(account);
             }
-        }); else {
-            auto msg = "the dapp " + dapp + " is not owned by account " + owner.to_string();
-            eosio_assert(false, msg.c_str());
-        }
+        });
+
+        else eosio_assert(false, ("the dapp " + dapp + " is not owned by account " + owner.to_string()).c_str());
     }
 
     /***
@@ -137,48 +135,24 @@ public:
      * 3. If not, then check the globally available free fund for the remaining cost of an account creation
     */
     ACTION create(string& memo, name& account, public_key& ownerkey, public_key& activekey, string& origin){
-        Registry dapps(_self, _self.value);
-        
         auto iterator = dapps.find(toUUID(origin));
-        string msg;
 
         // Only owner/whitelisted account for the dapp can create accounts
         if(iterator != dapps.end())
         {
-            if(name(memo)== iterator->owner){
-                require_auth(iterator->owner);
-            } else if(checkIfWhitelisted(name(memo), origin)){
-                require_auth(name(memo));
-            } else if(origin == "free"){
-                msg = "using globally available free funds to create account";
-                print(msg.c_str());
-            }
-            else {
-                msg = "only owner or whitelisted accounts can create new user accounts for " + origin;
-                eosio_assert(false, msg.c_str());
-            }
-        }else {
-            auto msg = "no owner account found for " + origin;
-            eosio_assert(false, msg.c_str());
+            if(name(memo)== iterator->owner)                    require_auth(iterator->owner);
+            else if(checkIfWhitelisted(name(memo), origin))     require_auth(name(memo));
+            else if(origin == "free")                           print("using globally available free funds to create account");
+            else                                                eosio_assert(false, ("only owner or whitelisted accounts can create new user accounts for " + origin).c_str());
+        }
+        else {
+            eosio_assert(false, ("no owner account found for " + origin).c_str());
         }
 
-        key_weight ok = key_weight{ownerkey, 1};
-        authority ownerAuth{
-                .threshold = 1,
-                .keys = {ok},
-                .accounts = {},
-                .waits = {}
-        };
+        authority owner{ .threshold = 1, .keys = {key_weight{ownerkey, 1}}, .accounts = {}, .waits = {} };
+        authority active{ .threshold = 1, .keys = {key_weight{activekey, 1}}, .accounts = {}, .waits = {} };
 
-        key_weight ak = key_weight{activekey, 1};
-        authority activeAuth{
-                .threshold = 1,
-                .keys = {ak},
-                .accounts = {},
-                .waits = {}
-        };
-
-        createJointAccount(memo, account, origin, ownerAuth, activeAuth);                      
+        createJointAccount(memo, account, origin, owner, active);
     }
 
     /***
@@ -198,7 +172,6 @@ public:
 
         // check if the user is trying to reclaim the system tokens
         if(sym == getCoreSymbol().code().to_string()){
-            Balances balances(_self, _self.value);
 
             auto iterator = balances.find(common::toUUID(dapp));
 
@@ -243,19 +216,18 @@ public:
         } 
         // user is trying to reclaim custom dapp tokens
         else {
-            Registry dapps(_self, _self.value);
             auto iterator = dapps.find(toUUID(dapp));
             if(iterator != dapps.end())dapps.modify(iterator, same_payer, [&](auto& row){
-                if(row.airdropcontract != name("") && row.airdroptokens.symbol.code().to_string() == sym && row.owner == name(reclaimer)){
+                if(row.airdrop->contract != name("") && row.airdrop->tokens.symbol.code().to_string() == sym && row.owner == name(reclaimer)){
                     auto memo = "reimburse the remaining airdrop balance for " + dapp + " to " + reclaimer.to_string();
-                    if(row.airdroptokens != asset(0'0000, row.airdroptokens.symbol)){
+                    if(row.airdrop->tokens != asset(0'0000, row.airdrop->tokens.symbol)){
                         action(
-                        permission_level{ _self, "active"_n },
-                        row.airdropcontract,
-                        name("transfer"),
-                        make_tuple(_self, reclaimer, row.airdroptokens, memo)
+                            permission_level{ _self, "active"_n },
+                            row.airdrop->contract,
+                            name("transfer"),
+                            make_tuple(_self, reclaimer, row.airdrop->tokens, memo)
                         ).send();
-                        row.airdroptokens -= row.airdroptokens;
+                        row.airdrop->tokens -= row.airdrop->tokens;
                     } else {
                         msg = "No remaining airdrop balance for " + dapp + ".";
                         eosio_assert(false, msg.c_str());
@@ -289,7 +261,7 @@ void apply(uint64_t receiver, uint64_t code, uint64_t action) {
     auto self = receiver;
 
     if( code == self ) switch(action) {
-        EOSIO_DISPATCH_HELPER( createbridge, (set)(clean)(create)(define)(whitelist)(reclaim))
+        EOSIO_DISPATCH_HELPER( createbridge, (init)(clean)(create)(define)(whitelist)(reclaim))
     }
 
     else {

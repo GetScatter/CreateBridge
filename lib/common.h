@@ -1,8 +1,5 @@
 #pragma once
 
-#include <sstream>
-#include <string>
-
 #include <eosiolib/eosio.hpp>
 #include <eosiolib/asset.hpp>
 
@@ -18,14 +15,20 @@ namespace common {
         return std::hash<string>{}(username);
     }
 
-   std::vector<std::string> split(const std::string &s, char delim) {
-        std::stringstream ss(s);
-        std::string item;
-        std::vector<std::string> elems;
-        while (std::getline(ss, item, delim)) {
-            elems.push_back(item);
+    std::vector<std::string> split(const string& str, const string& delim) {
+        vector<string> parts;
+        if(str.size() == 0) return parts;
+        size_t prev = 0, pos = 0;
+        do
+        {
+            pos = str.find(delim, prev);
+            if (pos == string::npos) pos = str.length();
+            string token = str.substr(prev, pos-prev);
+            if (!token.empty()) parts.push_back(token);
+            prev = pos + delim.length();
         }
-        return elems;
+        while (pos < str.length() && prev < str.length());
+        return parts;
     }
 
     uint64_t generate_random(uint64_t seed, uint64_t val){
@@ -35,7 +38,7 @@ namespace common {
         // using LCG alogrithm : https://en.wikipedia.org/wiki/Linear_congruential_generator
         // used by standard c++ rand function : http://pubs.opengroup.org/onlinepubs/009695399/functions/rand.html
 
-        uint64_t seed2 = (uint32_t)((a * seed + c) % 0x7fffffff);        
+        uint64_t seed2 = (uint32_t)((a * seed + c) % 0x7fffffff);
         uint64_t value = ((uint64_t)seed2 * val) >> 31;
 
         return value;
@@ -60,7 +63,7 @@ namespace common {
 
     /***
      * Returns the contract name for new account action
-     */ 
+     */
     name getNewAccountContract(){
         Token token(createbridge, createbridge.value);
         return token.begin()->newaccountcontract;

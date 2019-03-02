@@ -42,22 +42,12 @@ public:
      * Called by the internal transfer function 
      */
     void addBalance(const name& from, const asset& quantity, string& memo){
-        int ram;
-        int totalaccounts;
-        vector<string> stats = common::split(memo, ',');
+
+        vector<string> stats = common::split(memo, ",");
         uint64_t id = common::toUUID(stats[0]);
 
-        if(stats[0] != "free"){
-            ram = stoi(stats[1]);
-        } else {
-            ram = 100;
-        }
-
-        if(stats.size() == 3){
-            totalaccounts = stoi(stats[2]);
-        } else {
-            totalaccounts = -1;
-        }
+        int ram = stats[0] == "free" ? 100 : stoi(stats[1]);
+        int totalaccounts = stats.size() == 3 ? stoi(stats[2]) : -1;
 
         balances::Balances balances(createbridge, createbridge.value);
         auto iterator = balances.find(id);

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# eos server node address
-eosnode=http://127.0.0.1:8888
+shopt -s expand_aliases
+source ~/.bash_aliases
 
 # This script calls the RECLAIM action of createbridge to get back the remaining token balance for a contributor
 # Arguments: 1. ORIGIN:         dapp name
@@ -10,12 +10,9 @@ eosnode=http://127.0.0.1:8888
 
 #NOTE: This script assumes that you have the keys for the contributor in your unlocked wallet
 
-#cleos
-cleos="cleos -u $eosnode"
-
 CHAIN_SYMBOL=${1:-EOS}
 ORIGIN=${2:-mydapp.org}
 CONTRIBUTOR=${3:-contributor1}
 
 # reclaim
-$cleos push action createbridge reclaim '["'$CONTRIBUTOR'","'$ORIGIN'","'$CHAIN_SYMBOL'"]' -p $CONTRIBUTOR
+cleos push action createbridge reclaim '["'$CONTRIBUTOR'","'$ORIGIN'","'$CHAIN_SYMBOL'"]' -p $CONTRIBUTOR

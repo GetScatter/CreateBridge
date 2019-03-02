@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# eos server node address
-eosnode=http://127.0.0.1:8888
+shopt -s expand_aliases
+source ~/.bash_aliases
 
 # This script calls the DEFINE action of createbridge to register an dapp with createbridge
 # Arguments: 1. DAPP_OWNER: account name to be registered as the owner of the dapp
@@ -14,27 +14,26 @@ eosnode=http://127.0.0.1:8888
 #            8. AIRDROP_SYMBOL:             symbol of dapp tokens
 #            9. AIRDROP_TOKEN_TOTAL:        the total number of dapp tokens to be airdropped
 #            10.AIRDROP_TOKEN_LIMIT:        the number of dapp tokens to be airdropped to every new account created
-#            11.WHITELISTED_ACCOUNT:        the account to whitelist to create new user accounts for the dapp on behalf of the owner
+#            11.CUSTODIAN_ACCOUNT:        the account to whitelist to create new user accounts for the dapp on behalf of the owner
 
 #NOTE: This script assumes that you have the keys for the DAPP_OWNER in your unlocked wallet
 
-#cleos
-cleos="cleos -u $eosnode"
 
-DAPP_OWNER=${1:-mydappowner1}
-ORIGIN=${2:-mydapp.org}
-CORE_SYMBOL=${3:-EOS}
-RAM=${4:-2.000}
-NET=${5:-1.000}
-CPU=${6:-1.000}
-AIRDROP_TOKEN_CONTRACT=${7:-mydapptoken1}
-AIRDROP_SYMBOL=${8:-'DP'}
-AIRDROP_TOKEN_TOTAL=${9:-1000.0000}
-AIRDROP_TOKEN_LIMIT=${10:-10.0000}
-WHITELISTED_ACCOUNT=${11:-whitelist111}
+DAPP_OWNER=${1:-eosio}
+ORIGIN=${2:-test2.com}
+RAM=${3:-"2.0000 EOS"}
+NET=${4:-"1.0000 EOS"}
+CPU=${5:-"1.0000 EOS"}
+AIRDROP_TOKEN_CONTRACT=${6:-exampletoken}
+AIRDROP_TOKEN_TOTAL=${7:-'1000.0000 EX'}
+AIRDROP_TOKEN_LIMIT=${8:-'10.0000 EX'}
+CUSTODIAN_ACCOUNT=${9:-appcustodian}
 
 # app registration
-$cleos push action createbridge define '["'$DAPP_OWNER'","'$ORIGIN'","'$RAM' '$CORE_SYMBOL'","'$NET' '$CORE_SYMBOL'","'$CPU' '$CORE_SYMBOL'","'$AIRDROP_TOKEN_CONTRACT'","'$AIRDROP_TOKEN_TOTAL' '$AIRDROP_SYMBOL'","'$AIRDROP_TOKEN_LIMIT' '$AIRDROP_SYMBOL'"]' -p $DAPP_OWNER
+AIRDROP_JSON='{"contract":"'$AIRDROP_TOKEN_CONTRACT'", "tokens":"'$AIRDROP_TOKEN_TOTAL'", "limit":"'$AIRDROP_TOKEN_LIMIT'"}'
+#PARAMS_JSON='{"owner":"'$DAPP_OWNER'", "dapp":"'$ORIGIN'", "ram":"'$RAM'", "net":"'$NET'", "cpu":"'$CPU'", "airdrop":'$AIRDROP_JSON'}'
+PARAMS_JSON='{"owner":"'$DAPP_OWNER'", "dapp":"'$ORIGIN'", "ram":"'$RAM'", "net":"'$NET'", "cpu":"'$CPU'", "airdrop":""}'
+cleos push action createbridge define "$PARAMS_JSON" -p $DAPP_OWNER
 
 # whitelist other accounts
-$cleos push action createbridge whitelist '["'$DAPP_OWNER'","'$WHITELISTED_ACCOUNT'","'$ORIGIN'"]' -p $DAPP_OWNER
+cleos push action createbridge whitelist '["'$DAPP_OWNER'","'$CUSTODIAN_ACCOUNT'","'$ORIGIN'"]' -p $DAPP_OWNER

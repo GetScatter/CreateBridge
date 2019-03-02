@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# eos server node address
-eosnode=http://127.0.0.1:8888
+shopt -s expand_aliases
+source ~/.bash_aliases
 
 # This script is used to contribute towards account creation for a dapp.
 # Arguments: 1. ORIGIN:         dapp name          
@@ -11,14 +11,11 @@ eosnode=http://127.0.0.1:8888
 
 #NOTE: This script assumes that you have the keys for the contributor in your unlocked wallet
 
-#cleos
-cleos="cleos -u $eosnode"
-
-ORIGIN=${1:-mydapp.org}
+ORIGIN=${1:-test.com}
 AMOUNT=${2:-"10.0000 EOS"}
 TOTAL_RAM=${2:-50}
 TOTAL_ACCOUNTS=${3:-100}
 CONTRIBUTOR=${4:-contributor1}
 
 # contribute
-$cleos transfer $CONTRIBUTOR createbridge "$AMOUNT" "$ORIGIN,$TOTAL_RAM,$TOTAL_ACCOUNTS" -p $CONTRIBUTOR
+cleos transfer $CONTRIBUTOR createbridge "$AMOUNT" "$ORIGIN,$TOTAL_RAM,$TOTAL_ACCOUNTS" -p $CONTRIBUTOR
