@@ -25,5 +25,5 @@ cleos transfer eosio contributor1 "1000.0000 EOS" -p eosio
 # Creating `exampletoken` contract
 cleos create account eosio exampletoken "$PKEY" "$PKEY"
 cleos set contract exampletoken $STANDARD_TOKEN_CONTRACT_DIR/eosio.token --abi eosio.token.abi -p exampletoken
-cleos push action eosio.token create '[ "eosio", "1000000000.0000 EXMPL"]' -p exampletoken
-cleos push action eosio.token issue '[ "eosio", "1000000000.0000 EXMPL", "init" ]' -p eosio
+cleos push action eosio.token create '[ "eosio", "1000000000.0000 EX"]' -p exampletoken
+cleos push action eosio.token issue '[ "eosio", "1000000000.0000 EX", "init" ]' -p eosio
