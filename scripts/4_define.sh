@@ -14,13 +14,13 @@ source ~/.bash_aliases
 #            8. AIRDROP_SYMBOL:             symbol of dapp tokens
 #            9. AIRDROP_TOKEN_TOTAL:        the total number of dapp tokens to be airdropped
 #            10.AIRDROP_TOKEN_LIMIT:        the number of dapp tokens to be airdropped to every new account created
-#            11.CUSTODIAN_ACCOUNT:        the account to whitelist to create new user accounts for the dapp on behalf of the owner
+#            11.CUSTODIAN_ACCOUNT:          the account to whitelist to create new user accounts for the dapp on behalf of the owner
 
 #NOTE: This script assumes that you have the keys for the DAPP_OWNER in your unlocked wallet
 
 
 DAPP_OWNER=${1:-eosio}
-ORIGIN=${2:-test2.com}
+ORIGIN=${2:-test.com}
 RAM=${3:-"2.0000 EOS"}
 NET=${4:-"1.0000 EOS"}
 CPU=${5:-"1.0000 EOS"}
@@ -34,6 +34,10 @@ AIRDROP_JSON='{"contract":"'$AIRDROP_TOKEN_CONTRACT'", "tokens":"'$AIRDROP_TOKEN
 PARAMS_JSON='{"owner":"'$DAPP_OWNER'", "dapp":"'$ORIGIN'", "ram":"'$RAM'", "net":"'$NET'", "cpu":"'$CPU'", "airdrop":'$AIRDROP_JSON'}'
 #PARAMS_JSON='{"owner":"'$DAPP_OWNER'", "dapp":"'$ORIGIN'", "ram":"'$RAM'", "net":"'$NET'", "cpu":"'$CPU'", "airdrop":null}'
 cleos push action createbridge define "$PARAMS_JSON" -p $DAPP_OWNER
+
+# send the airdrop tokens to createbridge
+TRANSFER_JSON='{"from":"'$DAPP_OWNER'","to":"createbridge","quantity":"'$AIRDROP_TOKEN_TOTAL'","memo":"transfer airdrop tokens"}'
+cleos push action $AIRDROP_TOKEN_CONTRACT transfer "$TRANSFER_JSON" -p $DAPP_OWNER
 
 # whitelist other accounts
 cleos push action createbridge whitelist '["'$DAPP_OWNER'","'$CUSTODIAN_ACCOUNT'","'$ORIGIN'"]' -p $DAPP_OWNER

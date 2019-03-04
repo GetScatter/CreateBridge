@@ -18,6 +18,7 @@ echo ${OUTPUT_DIR}
 echo ${CONTRACT_ACCOUNT}
 
 eosio-cpp --abigen --contract=${CONTRACT_NAME} ../${CONTRACT_NAME}.cpp -o ${OUTPUT_DIR}/${CONTRACT_NAME}.wasm
+eosio-wasm2wast ../${CONTRACT_NAME}.wasm -o ../${CONTRACT_NAME}.wast
 
 # makes contract eosjs1 compatible
 sed -i 's/1.1/1.0/g' ${OUTPUT_DIR}/${CONTRACT_NAME}.abi

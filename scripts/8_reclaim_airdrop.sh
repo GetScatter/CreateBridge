@@ -10,9 +10,9 @@ source ~/.bash_aliases
 
 #NOTE: This script assumes that you have the keys for the contributor in your unlocked wallet
 
-ORIGIN=${1:-mydapp.org}
-DAPP_OWNER=${2:-mydappowner1}
-TOKEN=${3:-DP}
+ORIGIN=${1:-test.com}
+DAPP_OWNER=${2:-eosio}
+TOKEN=${3:-EX}
 
 # reclaim dapp tokens
 cleos push action createbridge reclaim '["'$DAPP_OWNER'","'$ORIGIN'","'$TOKEN'"]' -p $DAPP_OWNER

@@ -11,7 +11,7 @@ source ~/.bash_aliases
 #NOTE: This script assumes that you have the keys for the contributor in your unlocked wallet
 
 CHAIN_SYMBOL=${1:-EOS}
-ORIGIN=${2:-mydapp.org}
+ORIGIN=${2:-test.com}
 CONTRIBUTOR=${3:-contributor1}
 
 # reclaim
