@@ -55,7 +55,7 @@ public:
      * Called to specify the following details:
      * symbol:              the core token of the chain or the token used to pay for new user accounts of the chain  
      * newAccountContract:  the contract to call for new account action 
-     * ram_bytes:           minimum bytes of RAM to put in a new account created on the chain 
+     * minimumram:           minimum bytes of RAM to put in a new account created on the chain 
     */
     ACTION init(const symbol& symbol, name newaccountcontract, uint64_t minimumram){
         require_auth(_self);
