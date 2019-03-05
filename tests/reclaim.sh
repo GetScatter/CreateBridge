@@ -11,7 +11,7 @@ cleos="cleos -u $eosnode"
 
 ORIGIN=${1:-mydapp.org}
 CONTRIBUTOR=${2:-contributor1}
-CHAIN_SYMBOL=${3:-SYS}
+CHAIN_SYMBOL=${3:-EOS}
 
 # contributions
 $cleos transfer $CONTRIBUTOR createbridge "5.0000 $CHAIN_SYMBOL" "$ORIGIN,50,100" -p $CONTRIBUTOR

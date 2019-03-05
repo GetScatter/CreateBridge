@@ -16,9 +16,11 @@ MEMO=${3:-asdf}
 CONTRIBUTOR=${4:-contributor1}
 CREATOR=${5:-mydappowner1}
 
-$cleos push action createbridge define '["","free","2.0000 SYS","1.0000 SYS","1.0000 SYS","","0.0000 SYS","0.0000 SYS"]' -p createbridge@active
+AIRDROP_JSON='{"contract":"", "tokens":"0 EOS", "limit":"0 EOS"}'
+PARAMS_JSON='{"owner":"'$CREATOR'", "dapp":"'$ORIGIN'", "ram_bytes":"4096", "net":"1.0000 EOS", "cpu":"1.0000 EOS", "airdrop":'$AIRDROP_JSON'}'
+$cleos push action createbridge define "$PARAMS_JSON" -p createbridge@active
 
-$cleos transfer $CONTRIBUTOR createbridge "10.0000 SYS" "free" -p $CONTRIBUTOR
+$cleos transfer $CONTRIBUTOR createbridge "10.0000 EOS" "free" -p $CONTRIBUTOR
 
 $cleos push action createbridge create '["'$MEMO'", "'$NAME'", "EOS4xJvy2tYU21reKbbq4RPLxgzxNmrLtidVWpio5Ggwisfkgzg2L","EOS4xJvy2tYU21reKbbq4RPLxgzxNmrLtidVWpio5Ggwisfkgzg2L", "'$ORIGIN'"]' -p $CREATOR
 
