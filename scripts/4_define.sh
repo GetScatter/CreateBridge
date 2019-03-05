@@ -7,7 +7,7 @@ source ~/.bash_aliases
 # Arguments: 1. DAPP_OWNER: account name to be registered as the owner of the dapp
 #            2. ORIGIN:                     a unique string to register the dapp
 #            3. CORE_SYMBOL:                core symbol of the chain 
-#            4. RAM:                        specify the amount of RAM to put in the new user accounts created for the dapp
+#            4. RAM_BYTES:                  bytes of RAM to put in the new user accounts created for the dapp
 #            5. NET:                        amount of core tokens to be staked for net bandwidth for the new user accounts
 #            6. CPU:                        amount of core tokens to be staked for cpu for the new user accounts
 #            7. AIRDROP_TOKEN_CONTRACT:     the contract name under which the dapp token is deployed 
@@ -21,7 +21,7 @@ source ~/.bash_aliases
 
 DAPP_OWNER=${1:-eosio}
 ORIGIN=${2:-test.com}
-RAM=${3:-"2.0000 EOS"}
+RAM_BYTES=${3:-5120}
 NET=${4:-"1.0000 EOS"}
 CPU=${5:-"1.0000 EOS"}
 AIRDROP_TOKEN_CONTRACT=${6:-exampletoken}
@@ -31,7 +31,7 @@ CUSTODIAN_ACCOUNT=${9:-appcustodian}
 
 # app registration
 AIRDROP_JSON='{"contract":"'$AIRDROP_TOKEN_CONTRACT'", "tokens":"'$AIRDROP_TOKEN_TOTAL'", "limit":"'$AIRDROP_TOKEN_LIMIT'"}'
-PARAMS_JSON='{"owner":"'$DAPP_OWNER'", "dapp":"'$ORIGIN'", "ram":"'$RAM'", "net":"'$NET'", "cpu":"'$CPU'", "airdrop":'$AIRDROP_JSON'}'
+PARAMS_JSON='{"owner":"'$DAPP_OWNER'", "dapp":"'$ORIGIN'", "ram_bytes":"'$RAM_BYTES'", "net":"'$NET'", "cpu":"'$CPU'", "airdrop":'$AIRDROP_JSON'}'
 #PARAMS_JSON='{"owner":"'$DAPP_OWNER'", "dapp":"'$ORIGIN'", "ram":"'$RAM'", "net":"'$NET'", "cpu":"'$CPU'", "airdrop":null}'
 cleos push action createbridge define "$PARAMS_JSON" -p $DAPP_OWNER
 
