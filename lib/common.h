@@ -44,9 +44,16 @@ namespace common {
         return value;
     }
 
+    /**********************************************/
+    /***                                        ***/
+    /***            Chain constants             ***/
+    /***                                        ***/
+    /**********************************************/
+
     struct [[eosio::table, eosio::contract("createbridge")]] token {
         symbol S_SYS;
         name   newaccountcontract;
+        uint64_t min_ram;
         uint64_t primary_key()const { return S_SYS.raw(); }
     };
 
@@ -67,5 +74,52 @@ namespace common {
     name getNewAccountContract(){
         Token token(createbridge, createbridge.value);
         return token.begin()->newaccountcontract;
+    }
+
+    /**
+     * Returns the minimum bytes of RAM for new account creation
+     */
+    uint64_t getMinimumRAM(){
+        Token token(createbridge, createbridge.value);
+        return token.begin()->min_ram;
+    }
+
+    /**********************************************/
+    /***                                        ***/
+    /***            RAM calculations            ***/
+    /***                                        ***/
+    /**********************************************/
+
+    struct rammarket {
+        asset    supply;
+
+        struct connector {
+            asset balance;
+            double weight = .5;
+        };
+
+        connector base;
+        connector quote;
+
+        uint64_t primary_key()const { return supply.symbol.raw(); }
+    };
+
+    typedef eosio::multi_index<"rammarket"_n, rammarket> RamInfo;
+
+    /***
+     * Returns the price of ram for given bytes
+     */
+
+    asset getRamCost(uint64_t ram_bytes){
+       RamInfo ramInfo(name("eosio"), name("eosio").value);
+       auto ramData = ramInfo.find(S_RAM.raw());
+       symbol coreSymbol = getCoreSymbol();
+       eosio_assert(ramData != ramInfo.end(), "Could not get RAM info");
+
+       uint64_t base = ramData->base.balance.amount;
+       print("\nbase\n");
+       print(std::to_string(base));
+       uint64_t quote = ramData->quote.balance.amount;
+       return asset((((double)quote / base))*ram_bytes, coreSymbol);
     }
 };
