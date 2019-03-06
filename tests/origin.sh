@@ -11,7 +11,7 @@ eosnode=http://127.0.0.1:8888
 #cleos
 cleos="cleos -u $eosnode"
 
-CHAIN_SYMBOL=${1:-SYS}
+CHAIN_SYMBOL=${1:-EOS}
 NAME=${2:-mydappuser11}
 ORIGIN=${3:-mydapp.org}
 TOKEN_CONTRACT=${4:-mydapptoken1}
@@ -20,7 +20,9 @@ DAPP_OWNER=${6:-mydappowner1}
 MEMO=${7:-contributor1}
 
 # app registration
-$cleos push action createbridge define '["'$DAPP_OWNER'","'$ORIGIN'","2.0000 '$CHAIN_SYMBOL'","1.0000 '$CHAIN_SYMBOL'","1.0000 '$CHAIN_SYMBOL'","'$TOKEN_CONTRACT'","1000.0000 '$TOKEN_SYMBOL'","10.0000 '$TOKEN_SYMBOL'"]' -p $DAPP_OWNER
+AIRDROP_JSON='{"contract":"'$TOKEN_CONTRACT'", "tokens":"1000.0000 '$CHAIN_SYMBOL'", "limit":"10.0000 '$CHAIN_SYMBOL'"}'
+PARAMS_JSON='{"owner":"'$DAPP_OWNER'", "dapp":"'$ORIGIN'", "ram_bytes":"4096", "net":"1.0000 '$CHAIN_SYMBOL'", "cpu":"1.0000 '$CHAIN_SYMBOL'", "airdrop":'$AIRDROP_JSON'}'
+$cleos push action createbridge define "$PARAMS_JSON" -p $DAPP_OWNER
 
 # whitelisting
 $cleos push action createbridge whitelist '["'$DAPP_OWNER'","'$MEMO'","'$ORIGIN'"]' -p $DAPP_OWNER

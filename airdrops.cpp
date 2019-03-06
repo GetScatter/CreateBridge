@@ -29,8 +29,7 @@ public:
                     ).send();
                     row.airdrop->tokens -= tokens;
                 } else {
-                    auto msg = "Not enough " + row.airdrop->tokens.symbol.code().to_string() + " with createbridge to airdrop.";
-                    eosio_assert(false,msg.c_str());
+                    eosio_assert(false,("Not enough " + row.airdrop->tokens.symbol.code().to_string() + " with createbridge to airdrop.").c_str());
                 }
             }
         });   

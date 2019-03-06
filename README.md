@@ -36,7 +36,7 @@ Taking the lead from the scatter team, we have added some more features:
 ### Define your dapp with createbridge
 
 If you are a creator of a dapp, you can define a unique identifier for the dapp and register the `owner` account name for the dapp. 
-You can also specify the amount of EOS for RAM, NET and CPU (in that order) to give to the new user accounts. 
+You can also specify the RAM in bytes, the amount of EOS for NET and CPU (in that order) to give to the new user accounts. 
 Also, if you wish to airdrop dapp tokens to the newly created account specify the airdrop contract, total airdrop supply
 and the amount to airdrop to every new user account created. 
 ```

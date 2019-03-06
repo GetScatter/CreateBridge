@@ -52,33 +52,39 @@ public:
     /**********************************************/
 
     /***
-     * Specify the core token of the chain or the token used to pay for new user accounts of the chain  
-     * Also specify the contract to call for new account action 
+     * Called to specify the following details:
+     * symbol:              the core token of the chain or the token used to pay for new user accounts of the chain  
+     * newAccountContract:  the contract to call for new account action 
+     * minimumram:           minimum bytes of RAM to put in a new account created on the chain 
     */
-    ACTION init(const symbol& symbol, name newAccountContract){
+    ACTION init(const symbol& symbol, name newaccountcontract, uint64_t minimumram){
         require_auth(_self);
 
         auto iterator = token.find(symbol.raw());
+
         if(iterator == token.end())token.emplace(_self, [&](auto& row){
             row.S_SYS = symbol;
-            row.newaccountcontract = newAccountContract;
-
-        }); else {
-            eosio_assert(false, "the core symbol of the chain has already been defined.");
-        }      
+            row.newaccountcontract = newaccountcontract;
+            row.min_ram = minimumram;
+        }); else token.modify(iterator, same_payer, [&](auto& row){
+            row.S_SYS = symbol;
+            row.newaccountcontract = newaccountcontract;
+            row.min_ram = minimumram;
+        });    
     }
 
     /***
      * Called to define an account name as the owner of a dapp along with the following details:
      * owner:           account name to be registered as the owner of the dapp 
      * dapp:            the string/account name representing the dapp
-     * ram:             ram to put in the new user account created for the dapp
+     * ram_bytes:       bytes of ram to put in the new user account created for the dapp
      * net:             EOS amount to be staked for net
      * cpu:             EOS amount to be staked for cpu
      * airdropcontract: airdropdata struct/json or null
      * Only the owner account/whitelisted account will be able to create new user account for the dapp
      */ 
-    ACTION define(name& owner, string dapp, asset ram, asset net, asset cpu, airdropdata& airdrop) {
+
+    ACTION define(name& owner, string dapp, uint64_t ram_bytes, asset net, asset cpu, airdropdata& airdrop) {
         require_auth(dapp != "free" ? owner : _self);
 
         auto iterator = dapps.find(toUUID(dapp));
@@ -86,11 +92,15 @@ public:
         eosio_assert(iterator == dapps.end() || (iterator != dapps.end() && iterator->owner == owner),
                 ("the dapp " + dapp + " is already registered by another account").c_str());
 
+        uint64_t min_ram = getMinimumRAM();
+
+        eosio_assert(ram_bytes >= min_ram, ("ram for new accounts must be equal to or greater than " + to_string(min_ram) + " bytes.").c_str());
+
         // Creating a new dapp reference
         if(iterator == dapps.end()) dapps.emplace(_self, [&](auto& row){
             row.owner = owner;
             row.dapp = dapp;
-            row.ram = ram;
+            row.ram_bytes = ram_bytes;
             row.net = net;
             row.cpu = cpu;
             row.airdrop = airdrop;
@@ -98,7 +108,7 @@ public:
 
         // Updating an existing dapp reference's configurations
         else dapps.modify(iterator, same_payer, [&](auto& row){
-            row.ram = ram;
+            row.ram_bytes = ram_bytes;
             row.net = net;
             row.cpu = cpu;
             row.airdrop = airdrop;
@@ -168,7 +178,6 @@ public:
 
         asset reclaimer_balance;
         bool nocontributor;
-        string msg;
 
         // check if the user is trying to reclaim the system tokens
         if(sym == getCoreSymbol().code().to_string()){
@@ -187,8 +196,7 @@ public:
                         row.contributors.erase(reclaimer_record, row.contributors.end());
                         row.balance -= reclaimer_balance;
                     } else {
-                        msg = "no remaining contribution for " + dapp + " by " + reclaimer.to_string();
-                        eosio_assert(false, msg.c_str());
+                        eosio_assert(false, ("no remaining contribution for " + dapp + " by " + reclaimer.to_string()).c_str());
                     }   
 
                 nocontributor = row.contributors.empty();
@@ -209,8 +217,7 @@ public:
             ).send();
 
             } else {
-                msg = "no funds given by " + reclaimer.to_string() +  " for " + dapp;
-                eosio_assert(false, msg.c_str());
+                eosio_assert(false, ("no funds given by " + reclaimer.to_string() +  " for " + dapp).c_str());
             } 
 
         } 
@@ -229,13 +236,11 @@ public:
                         ).send();
                         row.airdrop->tokens -= row.airdrop->tokens;
                     } else {
-                        msg = "No remaining airdrop balance for " + dapp + ".";
-                        eosio_assert(false, msg.c_str());
+                        eosio_assert(false, ("No remaining airdrop balance for " + dapp + ".").c_str());
                     }
 
                 } else {
-                    msg = "the remaining airdrop balance for " + dapp + " can only be claimed by its owner/whitelisted account.";
-                    eosio_assert(false, msg.c_str());
+                    eosio_assert(false, ("the remaining airdrop balance for " + dapp + " can only be claimed by its owner/whitelisted account.").c_str());
                 }
             });  
         }

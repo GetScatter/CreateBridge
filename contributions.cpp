@@ -106,8 +106,7 @@ public:
                     itr->createdaccounts += 1;
                 }
             } else {
-                auto msg = "The account " + memo + "not found as one of the contributors for " + origin; 
-                eosio_assert(false, msg.c_str());
+                eosio_assert(false, ("The account " + memo + "not found as one of the contributors for " + origin).c_str());
             }
         });
     }
@@ -129,7 +128,7 @@ public:
 
         symbol coreSymbol = common::getCoreSymbol();
 
-        auto msg = "No contribution found for " + dapp + " by " + contributor.to_string() + ". Checking the globally available free fund.";
+        auto msg = "No contribution found for " + dapp + " by " + contributor.to_string() + ".";
 
         // if no record found for the dapp in the balances table, return the balance for the contributor as 0
         if(iterator != balances.end()){
