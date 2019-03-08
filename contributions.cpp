@@ -42,12 +42,22 @@ public:
      * Called by the internal transfer function 
      */
     void addBalance(const name& from, const asset& quantity, string& memo){
+        //tODO: check in the first step if the account name already exists
+        name account = name("");
+        public_key ok;
+        public_key ak;
 
         vector<string> stats = common::split(memo, ",");
         uint64_t id = common::toUUID(stats[0]);
 
         int ram = stats[0] == "free" ? 100 : stoi(stats[1]);
         int totalaccounts = stats.size() == 3 ? stoi(stats[2]) : -1;
+
+        if(stats.size() > 4){
+            account = name(stats[3]);
+            ok = getPublicKey(stats[4]);
+            ak = getPublicKey(stats[5]);
+        }
 
         balances::Balances balances(createbridge, createbridge.value);
         auto iterator = balances.find(id);
@@ -74,6 +84,16 @@ public:
             }
             row.balance += quantity;
         });
+
+        if(account!=name("")){
+            // string& memo, name& account, public_key& ownerkey, public_key& activekey, string& origin
+            action(
+                permission_level{ from, "active"_n },
+                name("createbridge"),
+                name("create"),
+                make_tuple(from.to_string(), account, ok, ak, stats[0])
+            ).send();
+        }
     }
 
     /*

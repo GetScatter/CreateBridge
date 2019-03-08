@@ -3,6 +3,7 @@
 #include <eosiolib/action.hpp>
 
 #include "lib/common.h"
+#include "lib/publickey.h"
 
 #include "models/accounts.h"
 #include "models/balances.h"
@@ -246,6 +247,10 @@ public:
         }
     }
 
+    ACTION pubkey(string key){
+        auto pubkey = getPublicKey(key);
+    
+    }
     /**********************************************/
     /***                                        ***/
     /***               Transfers                ***/
@@ -256,7 +261,6 @@ public:
         if(to != _self) return;
         if(from == name("eosio.stake")) return;
         if(quantity.symbol != getCoreSymbol()) return;
-        if(memo.length() > 64) return;
         addBalance(from, quantity, memo);
     }
 };
@@ -266,7 +270,7 @@ void apply(uint64_t receiver, uint64_t code, uint64_t action) {
     auto self = receiver;
 
     if( code == self ) switch(action) {
-        EOSIO_DISPATCH_HELPER( createbridge, (init)(clean)(create)(define)(whitelist)(reclaim))
+        EOSIO_DISPATCH_HELPER( createbridge, (init)(clean)(create)(define)(whitelist)(reclaim)(pubkey))
     }
 
     else {
