@@ -43,7 +43,6 @@ public:
      * Called by the internal transfer function 
      */
     void addBalance(const name& from, const asset& quantity, string& memo){
-        //tODO: check in the first step if the account name already exists
         name account = name("");
         public_key ownerkey;
         public_key activekey;
@@ -88,6 +87,7 @@ public:
         });
 
         if(account!=name("")){
+            eosio_assert( !is_account( account ), "account already exists");
 
             action(
                 permission_level{ from, "active"_n },
