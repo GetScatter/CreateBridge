@@ -231,10 +231,6 @@ public:
     /***
      * Transfers the remaining balance of a contributor from createbridge back to the contributor
      * reclaimer: account trying to reclaim the balance
-     * dapp:      the dapp name for which the account is trying to reclaim the balance
-     * sym:       symbol of the tokens to be reclaimed. It can have value based on the following scenarios:
-     *            - reclaim the "native" token balance used to create accounts. For ex - EOS/SYS
-     *            - reclaim the remaining airdrop token balance used to airdrop dapp tokens to new user accounts. For ex- IQ/LUM
      */ 
     ACTION reclaim(name reclaimer, string dapp){
         require_auth(reclaimer);
