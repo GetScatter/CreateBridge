@@ -179,7 +179,7 @@ public:
 
         asset reclaimer_balance;
         bool nocontributor;
-        
+
         // check if the user is trying to reclaim the system tokens
         if(sym == getCoreSymbol().code().to_string()){
 
@@ -247,10 +247,6 @@ public:
         }
     }
 
-    ACTION pubkey(string key){
-        auto pubkey = getPublicKey(key);
-    
-    }
     /**********************************************/
     /***                                        ***/
     /***               Transfers                ***/
@@ -270,7 +266,7 @@ void apply(uint64_t receiver, uint64_t code, uint64_t action) {
     auto self = receiver;
 
     if( code == self ) switch(action) {
-        EOSIO_DISPATCH_HELPER( createbridge, (init)(clean)(create)(define)(whitelist)(reclaim)(pubkey))
+        EOSIO_DISPATCH_HELPER( createbridge, (init)(clean)(create)(define)(whitelist)(reclaim))
     }
 
     else {
