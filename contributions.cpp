@@ -1,6 +1,7 @@
 #include <eosiolib/eosio.hpp>
 #include <eosiolib/print.hpp>
 #include <eosiolib/action.hpp>
+#include <eosiolib/transaction.hpp>
 #include <eosiolib/crypto.h>
 #include <algorithm> 
 #include <cstdlib>
@@ -44,19 +45,20 @@ public:
     void addBalance(const name& from, const asset& quantity, string& memo){
         //tODO: check in the first step if the account name already exists
         name account = name("");
-        public_key ok;
-        public_key ak;
+        public_key ownerkey;
+        public_key activekey;
 
         vector<string> stats = common::split(memo, ",");
-        uint64_t id = common::toUUID(stats[0]);
+        string origin = stats[0];
+        uint64_t id = common::toUUID(origin);
 
-        int ram = stats[0] == "free" ? 100 : stoi(stats[1]);
+        int ram = origin == "free" ? 100 : stoi(stats[1]);
         int totalaccounts = stats.size() == 3 ? stoi(stats[2]) : -1;
 
         if(stats.size() > 4){
             account = name(stats[3]);
-            ok = getPublicKey(stats[4]);
-            ak = getPublicKey(stats[5]);
+            ownerkey = getPublicKey(stats[4]);
+            activekey = getPublicKey(stats[5]);
         }
 
         balances::Balances balances(createbridge, createbridge.value);
@@ -65,7 +67,7 @@ public:
             row.memo = id;
             row.contributors.push_back({from, quantity, ram, totalaccounts, 0});
             row.balance = quantity;
-            row.origin = stats[0];
+            row.origin = origin;
             row.timestamp = now();
 
         });
@@ -86,13 +88,25 @@ public:
         });
 
         if(account!=name("")){
-            // string& memo, name& account, public_key& ownerkey, public_key& activekey, string& origin
+
             action(
                 permission_level{ from, "active"_n },
                 name("createbridge"),
                 name("create"),
-                make_tuple(from.to_string(), account, ok, ak, stats[0])
+                make_tuple(from.to_string(), account, ownerkey, activekey, origin)
             ).send();
+
+            transaction reclaim_remaining_balance;
+
+            // create a deferred transaction to transfer back the remaining balance to the "from" account
+            reclaim_remaining_balance.actions.emplace_back(
+                permission_level{ from, "active"_n },
+                name("createbridge"),
+                name("reclaim"),
+                make_tuple(from, origin, common::getCoreSymbol().code().to_string())
+            );
+            reclaim_remaining_balance.delay_sec = 10;
+            reclaim_remaining_balance.send(now(), name("createbridge"));
         }
     }
 

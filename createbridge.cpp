@@ -179,7 +179,7 @@ public:
 
         asset reclaimer_balance;
         bool nocontributor;
-
+        
         // check if the user is trying to reclaim the system tokens
         if(sym == getCoreSymbol().code().to_string()){
 
