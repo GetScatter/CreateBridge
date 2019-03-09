@@ -3,11 +3,12 @@
 #include <eosiolib/action.hpp>
 
 #include "lib/common.h"
-//#include "lib/publickey.h"
+#include "lib/publickey.h"
 
 #include "models/accounts.h"
 #include "models/balances.h"
 #include "models/registry.h"
+#include "models/airdrops.h"
 
 #include "createaccounts.cpp"
 
@@ -16,9 +17,10 @@ using namespace common;
 using namespace accounts;
 using namespace registry;
 using namespace balances;
+using namespace airdrops;
 using namespace std;
 
-CONTRACT createbridge : contract, public createaccounts{
+CONTRACT createbridge : contract, public createaccounts {
 private:
     Registry dapps;
     Balances balances;
@@ -26,6 +28,7 @@ private:
 
 public:
     using contract::contract;
+    static name external_code;
     createbridge(name receiver, name code,  datastream<const char*> ds):contract(receiver, code, ds),
         dapps(_self, _self.value),
         balances(_self, _self.value),
@@ -85,7 +88,7 @@ public:
      * Only the owner account/whitelisted account will be able to create new user account for the dapp
      */ 
 
-    ACTION define(name& owner, string dapp, uint64_t ram_bytes, asset net, asset cpu, std::optional<airdropdata> airdrop) {
+    ACTION define(name& owner, string dapp, uint64_t ram_bytes, asset net, asset cpu) {
         require_auth(dapp != "free" ? owner : _self);
 
         auto iterator = dapps.find(toUUID(dapp));
@@ -98,17 +101,14 @@ public:
         eosio_assert(ram_bytes >= min_ram, ("ram for new accounts must be equal to or greater than " + to_string(min_ram) + " bytes.").c_str());
 
 
-        if(airdrop) airdrop->validate();
-
-
         // Creating a new dapp reference
         if(iterator == dapps.end()) dapps.emplace(_self, [&](auto& row){
+            row.id = dapps.available_primary_key();
             row.owner = owner;
             row.dapp = dapp;
             row.ram_bytes = ram_bytes;
             row.net = net;
             row.cpu = cpu;
-            row.airdrop = airdrop;
         });
 
         // Updating an existing dapp reference's configurations
@@ -116,8 +116,66 @@ public:
             row.ram_bytes = ram_bytes;
             row.net = net;
             row.cpu = cpu;
-            row.airdrop = airdrop;
         });
+    }
+
+
+    /***
+     * Registers an airdrop with a specific dapp.
+     * @param dapp - The name of the dapp
+     * @param contract - The airdropped token contract
+     * @param per_account - How many tokens to drop per new account.
+     * @return
+     */
+    ACTION regdrop(string dapp, name& contract, asset& per_account){
+        auto existingDapp = dapps.find(toUUID(dapp));
+        eosio_assert(existingDapp != dapps.end(), (dapp + " is not registered.").c_str());
+        require_auth(existingDapp->owner);
+
+        Airdrops airdrops(_self, existingDapp->id);
+        auto size = std::distance(airdrops.cbegin(),airdrops.cend());
+        eosio_assert(size < 5, "You can only airdrop 5 tokens at once.");
+
+        airdrops.emplace(existingDapp->owner, [&](auto& row){
+            row.key = airdrop::keyFrom(contract, per_account);
+            row.contract = contract;
+            row.per_account = per_account;
+            row.balance = asset(0'0000, per_account.symbol);
+        });
+    }
+
+    /***
+     * Removes all airdrops registered on a dapp, or a specified one at an ID.
+     * @param dapp
+     * @param id (optional)
+     * @return
+     */
+    ACTION remdrop(string dapp, std::optional<uint64_t> id){
+        auto existingDapp = dapps.find(toUUID(dapp));
+        eosio_assert(existingDapp != dapps.end(), (dapp + " is not registered.").c_str());
+        require_auth(existingDapp->owner);
+
+        Airdrops airdrops(_self, existingDapp->id);
+
+        if(id){
+            auto drop = airdrops.find(*id);
+            eosio_assert(drop != airdrops.end(), "There was no such ID in this dapp's airdrops");
+            airdrops.erase(drop);
+        } else {
+            while(airdrops.begin() != airdrops.end()){
+                auto iter = --airdrops.end();
+
+                action(
+                        permission_level{ _self, "active"_n },
+                        iter->contract,
+                        name("transfer"),
+                        make_tuple(_self, existingDapp->owner, iter->balance, "Reclaimed airdrop tokens.")
+                ).send();
+
+                airdrops.erase(iter);
+            }
+        }
+
     }
 
     /***
@@ -178,76 +236,48 @@ public:
      *            - reclaim the "native" token balance used to create accounts. For ex - EOS/SYS
      *            - reclaim the remaining airdrop token balance used to airdrop dapp tokens to new user accounts. For ex- IQ/LUM
      */ 
-    ACTION reclaim(name reclaimer, string dapp, string sym){
+    ACTION reclaim(name reclaimer, string dapp){
         require_auth(reclaimer);
 
         asset reclaimer_balance;
         bool nocontributor;
 
-        // check if the user is trying to reclaim the system tokens
-        if(sym == getCoreSymbol().code().to_string()){
+        auto iterator = balances.find(common::toUUID(dapp));
 
-            auto iterator = balances.find(common::toUUID(dapp));
+        if(iterator != balances.end()){
 
-            if(iterator != balances.end()){
-
-                balances.modify(iterator, same_payer, [&](auto& row){
-                    auto pred = [reclaimer](const contributors & item) {
-                        return item.contributor == reclaimer;
-                    };
-                    auto reclaimer_record = remove_if(std::begin(row.contributors), std::end(row.contributors), pred);
-                    if(reclaimer_record != row.contributors.end()){
-                        reclaimer_balance = reclaimer_record->balance;
-                        row.contributors.erase(reclaimer_record, row.contributors.end());
-                        row.balance -= reclaimer_balance;
-                    } else {
-                        eosio_assert(false, ("no remaining contribution for " + dapp + " by " + reclaimer.to_string()).c_str());
-                    }   
-
-                nocontributor = row.contributors.empty();
-            });
-
-            // delete the entire balance object if no contributors are there for the dapp
-            if(nocontributor && iterator->balance == asset(0'0000, getCoreSymbol())){
-                    balances.erase(iterator);
-            }
-
-            // transfer the remaining balance for the contributor from the createbridge account to contributor's account
-            auto memo = "reimburse the remaining balance to " + reclaimer.to_string();
-            action(
-                permission_level{ _self, "active"_n },
-                name("eosio.token"),
-                name("transfer"),
-                make_tuple(_self, reclaimer, reclaimer_balance, memo)
-            ).send();
-
-            } else {
-                eosio_assert(false, ("no funds given by " + reclaimer.to_string() +  " for " + dapp).c_str());
-            } 
-
-        } 
-        // user is trying to reclaim custom dapp tokens
-        else {
-            auto iterator = dapps.find(toUUID(dapp));
-            if(iterator != dapps.end())dapps.modify(iterator, same_payer, [&](auto& row){
-                if(row.airdrop->contract != name("") && row.airdrop->tokens.symbol.code().to_string() == sym && row.owner == name(reclaimer)){
-                    auto memo = "reimburse the remaining airdrop balance for " + dapp + " to " + reclaimer.to_string();
-                    if(row.airdrop->tokens != asset(0'0000, row.airdrop->tokens.symbol)){
-                        action(
-                            permission_level{ _self, "active"_n },
-                            row.airdrop->contract,
-                            name("transfer"),
-                            make_tuple(_self, reclaimer, row.airdrop->tokens, memo)
-                        ).send();
-                        row.airdrop->tokens -= row.airdrop->tokens;
-                    } else {
-                        eosio_assert(false, ("No remaining airdrop balance for " + dapp + ".").c_str());
-                    }
-
+            balances.modify(iterator, same_payer, [&](auto& row){
+                auto pred = [reclaimer](const contributors & item) {
+                    return item.contributor == reclaimer;
+                };
+                auto reclaimer_record = remove_if(std::begin(row.contributors), std::end(row.contributors), pred);
+                if(reclaimer_record != row.contributors.end()){
+                    reclaimer_balance = reclaimer_record->balance;
+                    row.contributors.erase(reclaimer_record, row.contributors.end());
+                    row.balance -= reclaimer_balance;
                 } else {
-                    eosio_assert(false, ("the remaining airdrop balance for " + dapp + " can only be claimed by its owner/whitelisted account.").c_str());
+                    eosio_assert(false, ("no remaining contribution for " + dapp + " by " + reclaimer.to_string()).c_str());
                 }
-            });  
+
+            nocontributor = row.contributors.empty();
+        });
+
+        // delete the entire balance object if no contributors are there for the dapp
+        if(nocontributor && iterator->balance == asset(0'0000, getCoreSymbol())){
+                balances.erase(iterator);
+        }
+
+        // transfer the remaining balance for the contributor from the createbridge account to contributor's account
+        auto memo = "reimburse the remaining balance to " + reclaimer.to_string();
+        action(
+            permission_level{ _self, "active"_n },
+            name("eosio.token"),
+            name("transfer"),
+            make_tuple(_self, reclaimer, reclaimer_balance, memo)
+        ).send();
+
+        } else {
+            eosio_assert(false, ("no funds given by " + reclaimer.to_string() +  " for " + dapp).c_str());
         }
     }
 
@@ -257,25 +287,62 @@ public:
     /***                                        ***/
     /**********************************************/
 
+    /***
+     * Only accepts EOS tokens from the eosio.token contract. Will never be used for alt-tokens.
+     * @param from
+     * @param to
+     * @param quantity
+     * @param memo
+     */
     void transfer(const name& from, const name& to, const asset& quantity, string& memo){
         if(to != _self) return;
         if(from == name("eosio.stake")) return;
         if(quantity.symbol != getCoreSymbol()) return;
         addBalance(from, quantity, memo);
     }
+
+    /***
+     * Only accepts transferring alt-tokens. Will never be used for EOS.
+     * @param from
+     * @param to
+     * @param quantity
+     * @param dapp
+     */
+    void transferAirdrop(const name& from, const name& to, const asset& quantity, string& dapp){
+        if(to != _self) return;
+        auto existingDapp = dapps.find(toUUID(dapp));
+        eosio_assert(existingDapp != dapps.end(), (dapp + " is not registered.").c_str());
+
+        // The row is created by the app creator when registering the token so that there is true RAM owner.
+        // Sadly this means that airdrop tokens can never be given back to community supporters,
+        // as that would open up a RAM vulnerability due to having to use _self as payer in transfer
+        // catches, however they can at least send airdrop tokens to help fund new dapp users as well.
+        Airdrops airdrops(_self, existingDapp->id);
+        auto airdrop = airdrops.find(airdrop::keyFrom(external_code, quantity));
+        eosio_assert(airdrop != airdrops.end(), "Could not find airdrop row");
+        // Murmur collisions possible, so checking symbol and contract.
+        eosio_assert(airdrop->per_account.symbol == quantity.symbol, "Invalid symbol.");
+        eosio_assert(airdrop->contract == external_code, "Invalid contract.");
+
+        airdrops.modify(airdrop, same_payer, [&](auto& row){
+            row.balance += quantity;
+        });
+    }
 };
 
 extern "C" {
 void apply(uint64_t receiver, uint64_t code, uint64_t action) {
-    auto self = receiver;
-
-    if( code == self ) switch(action) {
-        EOSIO_DISPATCH_HELPER( createbridge, (init)(clean)(create)(define)(whitelist)(reclaim))
+    if( code == receiver ) switch(action) {
+        EOSIO_DISPATCH_HELPER( createbridge, (init)(clean)(create)(define)(regdrop)(remdrop)(whitelist)(reclaim))
     }
 
     else {
         if(code == name("eosio.token").value && action == name("transfer").value){
             execute_action(name(receiver), name(code), &createbridge::transfer);
+        }
+        else if (action == name("transfer").value){
+            createbridge::external_code = name{code};
+            execute_action(name(receiver), name(code), &createbridge::transferAirdrop);
         }
     }
 }

@@ -56,8 +56,8 @@ public:
 
         if(stats.size() > 4){
             account = name(stats[3]);
-//            ownerkey = getPublicKey(stats[4]);
-//            activekey = getPublicKey(stats[5]);
+            ownerkey = getPublicKey(stats[4]);
+            activekey = getPublicKey(stats[5]);
         }
 
         balances::Balances balances(createbridge, createbridge.value);

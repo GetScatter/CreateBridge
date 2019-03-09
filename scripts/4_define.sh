@@ -20,7 +20,7 @@ source ~/.bash_aliases
 
 
 DAPP_OWNER=${1:-eosio}
-ORIGIN=${2:-test.com}
+DAPP=${2:-test.com}
 RAM_BYTES=${3:-5120}
 NET=${4:-"1.0000 EOS"}
 CPU=${5:-"1.0000 EOS"}
@@ -30,15 +30,16 @@ AIRDROP_TOKEN_LIMIT=${8:-'10.0000 EX'}
 CUSTODIAN_ACCOUNT=${9:-appcustodian}
 
 # app registration
-AIRDROP_JSON='{"contract":"'$AIRDROP_TOKEN_CONTRACT'", "tokens":"'$AIRDROP_TOKEN_TOTAL'", "limit":"'$AIRDROP_TOKEN_LIMIT'"}'
-PARAMS_JSON='{"owner":"'$DAPP_OWNER'", "dapp":"'$ORIGIN'", "ram_bytes":"'$RAM_BYTES'", "net":"'$NET'", "cpu":"'$CPU'", "airdrop":'$AIRDROP_JSON'}'
-#PARAMS_JSON='{"owner":"'$DAPP_OWNER'", "dapp":"'$ORIGIN'", "ram_bytes":"'$RAM_BYTES'", "net":"'$NET'", "cpu":"'$CPU'", "airdrop":null}'
+PARAMS_JSON='{"owner":"'$DAPP_OWNER'", "dapp":"'$DAPP'", "ram_bytes":"'$RAM_BYTES'", "net":"'$NET'", "cpu":"'$CPU'"}'
 cleos push action createbridge define "$PARAMS_JSON" -p $DAPP_OWNER
-#cleos push action createbridge define '["'$DAPP_OWNER'","'$ORIGIN'","'$RAM_BYTES'","1.0000 EOS","1.0000 EOS"]' -p $DAPP_OWNER
+
+cleos push action createbridge remdrop '["'$DAPP'", null]' -p $DAPP_OWNER
+AIRDROP_PARAMS_JSON='{"dapp":"'$DAPP'", "contract":"'$AIRDROP_TOKEN_CONTRACT'", "per_account":"'$AIRDROP_TOKEN_LIMIT'"}'
+cleos push action createbridge regdrop "$AIRDROP_PARAMS_JSON" -p $DAPP_OWNER
 
 ## send the airdrop tokens to createbridge
-#TRANSFER_JSON='{"from":"'$DAPP_OWNER'","to":"createbridge","quantity":"'$AIRDROP_TOKEN_TOTAL'","memo":"transfer airdrop tokens"}'
-#cleos push action $AIRDROP_TOKEN_CONTRACT transfer "$TRANSFER_JSON" -p $DAPP_OWNER
+TRANSFER_JSON='{"from":"'$DAPP_OWNER'","to":"createbridge","quantity":"'$AIRDROP_TOKEN_TOTAL'","memo":"'$DAPP'"}'
+cleos push action $AIRDROP_TOKEN_CONTRACT transfer "$TRANSFER_JSON" -p $DAPP_OWNER
 #
 ## whitelist other accounts
-#cleos push action createbridge whitelist '["'$DAPP_OWNER'","'$CUSTODIAN_ACCOUNT'","'$ORIGIN'"]' -p $DAPP_OWNER
+#cleos push action createbridge whitelist '["'$DAPP_OWNER'","'$CUSTODIAN_ACCOUNT'","'$DAPP'"]' -p $DAPP_OWNER

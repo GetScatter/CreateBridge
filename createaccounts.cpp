@@ -7,12 +7,12 @@
 #include "models/registry.h"
 
 #include "contributions.cpp"
-#include "airdrops.cpp"
+#include "droptokens.cpp"
 
 using namespace eosio;
 using namespace std;
 
-class createaccounts : public contributions, public airdrops{
+class createaccounts : public contributions, public droptokens {
 
 public:
     name createbridge = common::createbridge;
