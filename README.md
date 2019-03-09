@@ -48,7 +48,7 @@ cleos push action createbridge define '["mydappowner1","mydapp.org","1.0000 EOS"
 
 You can contribute to a dapp by specifying its name, the percentage of RAM cost you want to contribute and the total number of accounts you want to create, separated by comma in the memo field for transfer action.
 ```
-cleos transfer YOUR_ACCOUNT createbridge "token_balance" "dapp_name,ram_percentage,_total_accounts"
+cleos transfer YOUR_ACCOUNT createbridge "token_balance" "dapp_name,ram_percentage,total_accounts"
 
 cleos transfer YOUR_ACCOUNT createbridge "10.0000 EOS" "mydapp.org,50,100"
 
@@ -77,6 +77,15 @@ You can whitelist other accounts to create accounts on behalf of your dapp.
 ```
 cleos push action createbridge whitelist '[YOUR_ACCOUNT,account_name,dapp_name]'
 cleos push action createbridge whitelist '["mydappowner1",account_name,"mydapp.org"]'
+```
+
+### Fund createbridge and create accounts in one go
+You can contribute to a dapp and create a user account for the dapp at the same time by passing in the dapp name, ram percentage, total accounts (in this case 1), new account name, active key and owner key in order. The remaining balance is refunded back to the contributor after the account creation.
+
+```
+cleos transfer YOUR_ACCOUNT createbridge "token_balance" "dapp_name,ram_percentage,total_accounts,account_name,owner_key,active_key"
+
+cleos transfer YOUR_ACCOUNT createbridge "10.0000 EOS" "mydapp.org,100,1,mydappuser13,EOS4xJvy2tYU21reKbbq4RPLxgzxNmrLtidVWpio5Ggwisfkgzg2L,EOS4xJvy2tYU21reKbbq4RPLxgzxNmrLtidVWpio5Ggwisfkgzg2L"
 ```
 
 ### Globally Crowd-Free Accounts
