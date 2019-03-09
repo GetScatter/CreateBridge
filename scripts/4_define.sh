@@ -32,12 +32,13 @@ CUSTODIAN_ACCOUNT=${9:-appcustodian}
 # app registration
 AIRDROP_JSON='{"contract":"'$AIRDROP_TOKEN_CONTRACT'", "tokens":"'$AIRDROP_TOKEN_TOTAL'", "limit":"'$AIRDROP_TOKEN_LIMIT'"}'
 PARAMS_JSON='{"owner":"'$DAPP_OWNER'", "dapp":"'$ORIGIN'", "ram_bytes":"'$RAM_BYTES'", "net":"'$NET'", "cpu":"'$CPU'", "airdrop":'$AIRDROP_JSON'}'
-#PARAMS_JSON='{"owner":"'$DAPP_OWNER'", "dapp":"'$ORIGIN'", "ram":"'$RAM'", "net":"'$NET'", "cpu":"'$CPU'", "airdrop":null}'
+#PARAMS_JSON='{"owner":"'$DAPP_OWNER'", "dapp":"'$ORIGIN'", "ram_bytes":"'$RAM_BYTES'", "net":"'$NET'", "cpu":"'$CPU'", "airdrop":null}'
 cleos push action createbridge define "$PARAMS_JSON" -p $DAPP_OWNER
+#cleos push action createbridge define '["'$DAPP_OWNER'","'$ORIGIN'","'$RAM_BYTES'","1.0000 EOS","1.0000 EOS"]' -p $DAPP_OWNER
 
-# send the airdrop tokens to createbridge
-TRANSFER_JSON='{"from":"'$DAPP_OWNER'","to":"createbridge","quantity":"'$AIRDROP_TOKEN_TOTAL'","memo":"transfer airdrop tokens"}'
-cleos push action $AIRDROP_TOKEN_CONTRACT transfer "$TRANSFER_JSON" -p $DAPP_OWNER
-
-# whitelist other accounts
-cleos push action createbridge whitelist '["'$DAPP_OWNER'","'$CUSTODIAN_ACCOUNT'","'$ORIGIN'"]' -p $DAPP_OWNER
+## send the airdrop tokens to createbridge
+#TRANSFER_JSON='{"from":"'$DAPP_OWNER'","to":"createbridge","quantity":"'$AIRDROP_TOKEN_TOTAL'","memo":"transfer airdrop tokens"}'
+#cleos push action $AIRDROP_TOKEN_CONTRACT transfer "$TRANSFER_JSON" -p $DAPP_OWNER
+#
+## whitelist other accounts
+#cleos push action createbridge whitelist '["'$DAPP_OWNER'","'$CUSTODIAN_ACCOUNT'","'$ORIGIN'"]' -p $DAPP_OWNER

@@ -3,7 +3,7 @@
 #include <eosiolib/action.hpp>
 
 #include "lib/common.h"
-#include "lib/publickey.h"
+//#include "lib/publickey.h"
 
 #include "models/accounts.h"
 #include "models/balances.h"
@@ -85,7 +85,7 @@ public:
      * Only the owner account/whitelisted account will be able to create new user account for the dapp
      */ 
 
-    ACTION define(name& owner, string dapp, uint64_t ram_bytes, asset net, asset cpu, airdropdata& airdrop) {
+    ACTION define(name& owner, string dapp, uint64_t ram_bytes, asset net, asset cpu, std::optional<airdropdata> airdrop) {
         require_auth(dapp != "free" ? owner : _self);
 
         auto iterator = dapps.find(toUUID(dapp));
@@ -96,6 +96,10 @@ public:
         uint64_t min_ram = getMinimumRAM();
 
         eosio_assert(ram_bytes >= min_ram, ("ram for new accounts must be equal to or greater than " + to_string(min_ram) + " bytes.").c_str());
+
+
+        if(airdrop) airdrop->validate();
+
 
         // Creating a new dapp reference
         if(iterator == dapps.end()) dapps.emplace(_self, [&](auto& row){

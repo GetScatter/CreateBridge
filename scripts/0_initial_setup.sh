@@ -28,3 +28,7 @@ cleos create account eosio exampletoken "$PKEY" "$PKEY"
 cleos set contract exampletoken $STANDARD_TOKEN_CONTRACT_DIR/eosio.token --abi eosio.token.abi -p exampletoken
 cleos push action exampletoken create '[ "eosio", "1000000000.0000 EX"]' -p exampletoken
 cleos push action exampletoken issue '[ "eosio", "1000000000.0000 EX", "init" ]' -p eosio
+
+# Setting up the eosio.system contract
+cleos set contract eosio $STANDARD_TOKEN_CONTRACT_DIR/eosio.system -p eosio
+cleos push action eosio init '["0", "4,EOS"]' -p eosio

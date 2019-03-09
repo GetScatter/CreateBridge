@@ -6,6 +6,17 @@ namespace registry{
         name        contract;
         asset       tokens;
         asset       limit;
+
+        bool isEmpty(){
+            return contract == name("");
+        }
+
+        bool validate(){
+            if(isEmpty()) return true;
+            eosio_assert(tokens.amount > 0, "Airdrop tokens must have an amount greater than 0");
+            eosio_assert(limit.amount > 0, "Airdrop limit must have an amount greater than 0");
+            return true;
+        }
     };
 
     struct [[eosio::table, eosio::contract("createbridge")]] registry {
