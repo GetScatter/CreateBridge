@@ -20,3 +20,6 @@ cleos push action createbridge create '["'$CUSTODIAN_ACCOUNT'","'$NAME'","EOS6MR
 
 # Uncomment the below command if you want the dapp owner to create the new account
 # cleos push action createbridge create '["'$DAPP_OWNER'","'$NAME'","EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV","EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV","'$ORIGIN'"]' -p $DAPP_OWNER
+
+# Uncomment below if you want to contribute and create the new account at the same time
+# cleos transfer $CUSTODIAN_ACCOUNT createbridge "10.0000 EOS" "$ORIGIN,100,1,$NAME,EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV,EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV" -p $CUSTODIAN_ACCOUNT
