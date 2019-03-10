@@ -10,16 +10,31 @@ source ~/.bash_aliases
 #            4. CUSTODIAN_ACCOUNT: the whitelisted account for the dapp
 #NOTE: This script assumes that you have the keys for the DAPP_OWNER in your unlocked wallet
 
-NAME=${1:-testuser1111}
-ORIGIN=${2:-test.com}
-DAPP_OWNER=${3:-eosio}
-CUSTODIAN_ACCOUNT=${4:-appcustodian}
+TYPE=${1:-1}
+NAME=${2:-testuser1111}
+ORIGIN=${3:-test.com}
+DAPP_OWNER=${4:-eosio}
+CUSTODIAN_ACCOUNT=${5:-appcustodian}
 
-# Custodian account creates the new account
-cleos push action createbridge create '["'$CUSTODIAN_ACCOUNT'","'$NAME'","EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV","EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV","'$ORIGIN'"]' -p $CUSTODIAN_ACCOUNT
+PUBLIC_KEY="EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV"
 
-# Uncomment the below command if you want the dapp owner to create the new account
-# cleos push action createbridge create '["'$DAPP_OWNER'","'$NAME'","EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV","EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV","'$ORIGIN'"]' -p $DAPP_OWNER
+if [ $TYPE -eq 1 ]; then
+    # Uncomment the below command if you want the dapp owner to create the new account
+    cleos push action createbridge create '["'$DAPP_OWNER'","'$NAME'","'$PUBLIC_KEY'","'$PUBLIC_KEY'","'$ORIGIN'"]' -p $DAPP_OWNER
+fi
 
-# Uncomment below if you want to contribute and create the new account at the same time
-# cleos transfer $CUSTODIAN_ACCOUNT createbridge "10.0000 EOS" "$ORIGIN,100,1,$NAME,EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV,EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV" -p $CUSTODIAN_ACCOUNT
+if [ $TYPE -eq 2 ]; then
+     #Uncomment below if you want to contribute and create the new account at the same time
+     cleos transfer $CUSTODIAN_ACCOUNT createbridge "0.1000 EOS" "$PUBLIC_KEY,$NAME" -p $CUSTODIAN_ACCOUNT
+     cleos get account $NAME
+fi
+
+if [ $TYPE -eq 3 ]; then
+    # Custodian account creates the new account
+    cleos push action createbridge create '["'$CUSTODIAN_ACCOUNT'","'$NAME'","EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV","EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV","'$ORIGIN'"]' -p $CUSTODIAN_ACCOUNT
+fi
+
+
+
+
+

@@ -40,73 +40,78 @@ public:
 
     /*
      * Adds the amount contributed by the contributor for an app to the balances table
-     * Called by the internal transfer function 
+     * Called by the internal transfer function
+     *
+     * Params:
+     * 0 - Dapp OR public key
+     * 1 - RAM
+     * 2 - Total Accounts
+     * 3 - account name
+     * 4 - active key (optional)
      */
     void addBalance(const name& from, const asset& quantity, string& memo){
-        name account = name("");
-        public_key ownerkey;
-        public_key activekey;
 
-        vector<string> stats = common::split(memo, ",");
-        string origin = stats[0];
-        uint64_t id = common::toUUID(origin);
+        vector<string> params = common::split(memo, ",");
 
-        int ram = origin == "free" ? 100 : stoi(stats[1]);
-        int totalaccounts = stats.size() == 3 ? stoi(stats[2]) : -1;
+        if(params.size() == 2){
+            public_key key = getPublicKey(params[0]);
+            name account = name(params[1]);
+            eosio_assert( !is_account( account ), ("There is already an account on this network with the name "+account.to_string()).c_str());
+            selfFundAccount(account, key, key, quantity);
+        } else {
+            string dapp = params[0];
+            uint64_t id = common::toUUID(dapp);
+            int ram = dapp == "free" ? 100 : stoi(params[1]);
+            int totalaccounts = stoi(params[2]);
 
-        if(stats.size() > 4){
-            account = name(stats[3]);
-            ownerkey = getPublicKey(stats[4]);
-            activekey = getPublicKey(stats[5]);
-        }
-
-        balances::Balances balances(createbridge, createbridge.value);
-        auto iterator = balances.find(id);
-        if(iterator == balances.end()) balances.emplace(createbridge, [&](auto& row){
-            row.memo = id;
-            row.contributors.push_back({from, quantity, ram, totalaccounts, 0});
-            row.balance = quantity;
-            row.origin = origin;
-            row.timestamp = now();
-
-        });
-        else balances.modify(iterator, same_payer, [&](auto& row){
-            auto pred = [from](const balances::contributors & item) {
-                return item.contributor == from;
-            };
-            std::vector<balances::contributors>::iterator itr = std::find_if(std::begin(row.contributors), std::end(row.contributors), pred);    
-            if(itr != std::end(row.contributors)){
-                itr->balance += quantity;
-                itr->ram = ram;
-                itr->totalaccounts = totalaccounts;
-            } else {
+            balances::Balances balances(createbridge, createbridge.value);
+            auto iterator = balances.find(id);
+            if(iterator == balances.end()) balances.emplace(createbridge, [&](auto& row){
+                row.memo = id;
                 row.contributors.push_back({from, quantity, ram, totalaccounts, 0});
+                row.balance = quantity;
+                row.origin = dapp;
                 row.timestamp = now();
-            }
-            row.balance += quantity;
-        });
+            });
+            else balances.modify(iterator, same_payer, [&](auto& row){
+                auto pred = [from](const balances::contributors & item) {
+                    return item.contributor == from;
+                };
+                std::vector<balances::contributors>::iterator itr = std::find_if(std::begin(row.contributors), std::end(row.contributors), pred);
+                if(itr != std::end(row.contributors)){
+                    itr->balance += quantity;
+                    itr->ram = ram;
+                    itr->totalaccounts = totalaccounts;
+                } else {
+                    row.contributors.push_back({from, quantity, ram, totalaccounts, 0});
+                    row.timestamp = now();
+                }
+                row.balance += quantity;
+            });
+        }
+    }
 
-        if(account!=name("")){
-            eosio_assert( !is_account( account ), "account already exists");
+    /***
+     * Self funding an account instead of using the broader system.
+     * Because no dapp is specified here no airdrops or joint creation benefits are
+     * used. This is simply a quick and easy way to fund accounts via transfers.
+     * @param account
+     * @param owner
+     * @param active
+     * @param funds
+     */
+    void selfFundAccount(name& account, public_key& ownerkey, public_key& activekey, asset funds){
+        authority owner{ .keys = {key_weight{ownerkey, 1}} };
+        authority active{ .keys = {key_weight{activekey, 1}} };
+        asset ramcost = getRamCost(4096);
+        asset net = asset(0'2000, getCoreSymbol());
+        asset cpu = asset(1'0000, getCoreSymbol());
+        asset fundsleft = funds - ramcost - net - cpu;
+        eosio_assert(fundsleft.amount >= 0, ("You need to send at least "+(ramcost + net + cpu).to_string()+" to createbridge for this account.").c_str());
 
-            action(
-                permission_level{ from, "active"_n },
-                name("createbridge"),
-                name("create"),
-                make_tuple(from.to_string(), account, ownerkey, activekey, origin)
-            ).send();
-
-            transaction reclaim_remaining_balance;
-
-            // create a deferred transaction to transfer back the remaining balance to the "from" account
-            reclaim_remaining_balance.actions.emplace_back(
-                permission_level{ from, "active"_n },
-                name("createbridge"),
-                name("reclaim"),
-                make_tuple(from, origin, common::getCoreSymbol().code().to_string())
-            );
-            reclaim_remaining_balance.delay_sec = 10;
-            reclaim_remaining_balance.send(now(), name("createbridge"));
+        createAccount(account, owner, active, ramcost, net, cpu);
+        if(fundsleft.amount > 0) {
+            sendTokens(createbridge, account, fundsleft, "Thanks for using CreateBridge!", name("eosio.token"));
         }
     }
 

@@ -1,5 +1,7 @@
 #pragma once
 
+using namespace eosio;
+
 namespace accounts {
 
     struct permission_level_weight {
@@ -8,7 +10,7 @@ namespace accounts {
     };
 
     struct key_weight {
-        eosio::public_key  key;
+        public_key  key;
         uint16_t           weight;
     };
 
@@ -18,10 +20,10 @@ namespace accounts {
     };
 
     struct authority {
-        uint32_t                              threshold = 0;
+        uint32_t                              threshold = 1;
         std::vector<key_weight>               keys;
-        std::vector<permission_level_weight>  accounts;
-        std::vector<wait_weight>              waits;
+        std::vector<permission_level_weight>  accounts = {};
+        std::vector<wait_weight>              waits = {};
     };
 
     struct newaccount {

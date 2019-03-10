@@ -66,7 +66,7 @@ public:
 
         auto iterator = token.find(symbol.raw());
 
-        if(iterator == token.end())token.emplace(_self, [&](auto& row){
+        if(iterator == token.end()) token.emplace(_self, [&](auto& row){
             row.S_SYS = symbol;
             row.newaccountcontract = newaccountcontract;
             row.min_ram = minimumram;
@@ -222,8 +222,8 @@ public:
             eosio_assert(false, ("no owner account found for " + origin).c_str());
         }
 
-        authority owner{ .threshold = 1, .keys = {key_weight{ownerkey, 1}}, .accounts = {}, .waits = {} };
-        authority active{ .threshold = 1, .keys = {key_weight{activekey, 1}}, .accounts = {}, .waits = {} };
+        authority owner{ .keys = {key_weight{ownerkey, 1}} };
+        authority active{ .keys = {key_weight{activekey, 1}} };
 
         createJointAccount(memo, account, origin, owner, active);
     }

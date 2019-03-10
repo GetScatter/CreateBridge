@@ -10,13 +10,18 @@ source ~/.bash_aliases
 PKEY=${1:-EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV}
 STANDARD_TOKEN_CONTRACT_DIR=${2:-"$HOME/eosio.contracts"}
 
+# Creating basic system accounts
+cleos create account eosio eosio.ram "$PKEY" "$PKEY" -p eosio
+cleos create account eosio eosio.ramfee "$PKEY" "$PKEY" -p eosio
+cleos create account eosio eosio.stake "$PKEY" "$PKEY" -p eosio
+cleos create account eosio eosio.token "$PKEY" "$PKEY" -p eosio
+
 # Creating required testing accounts
 cleos create account eosio createbridge "$PKEY" "$PKEY"
 cleos create account eosio appcustodian "$PKEY" "$PKEY"
 cleos create account eosio contributor1 "$PKEY" "$PKEY"
 
 # Creating `eosio.token` contract
-cleos create account eosio eosio.token "$PKEY" "$PKEY"
 cleos set contract eosio.token $STANDARD_TOKEN_CONTRACT_DIR/eosio.token --abi eosio.token.abi -p eosio.token
 cleos push action eosio.token create '[ "eosio", "1000000000.0000 EOS"]' -p eosio.token
 cleos push action eosio.token issue '[ "eosio", "1000000000.0000 EOS", "init" ]' -p eosio

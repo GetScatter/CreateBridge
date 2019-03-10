@@ -112,39 +112,6 @@ public:
         return false;
     }
 
-    /***
-     * Calls the chain to create a new account
-     */ 
-    void createAccount(name& account, accounts::authority& ownerauth, accounts::authority& activeauth, asset& ram, asset& net, asset& cpu){
-        accounts::newaccount new_account = accounts::newaccount{
-            .creator = createbridge,
-            .name = account,
-            .owner = ownerauth,
-            .active = activeauth
-        };
 
-        name newAccountContract = common::getNewAccountContract();
-
-        action(
-            permission_level{ createbridge, "active"_n },
-            newAccountContract,
-            name("newaccount"),
-            new_account
-        ).send();
-
-        action(
-            permission_level{ createbridge, "active"_n },
-            newAccountContract,
-            name("buyram"),
-            make_tuple(createbridge, account, ram)
-        ).send();
-
-        action(
-            permission_level{ createbridge, "active"_n },
-            newAccountContract,
-            name("delegatebw"),
-            make_tuple(createbridge, account, net, cpu, true)
-        ).send();
-    };
 
 };
