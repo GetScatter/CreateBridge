@@ -5,7 +5,7 @@ source ~/.bash_aliases
 
 # This script calls the DEFINE action of createbridge to register an dapp with createbridge
 # Arguments: 1. DAPP_OWNER: account name to be registered as the owner of the dapp
-#            2. ORIGIN:                     a unique string to register the dapp
+#            2. DAPP:                     a unique string to register the dapp
 #            3. CORE_SYMBOL:                core symbol of the chain 
 #            4. RAM_BYTES:                  bytes of RAM to put in the new user accounts created for the dapp
 #            5. NET:                        amount of core tokens to be staked for net bandwidth for the new user accounts
@@ -25,20 +25,19 @@ RAM_BYTES=${3:-5120}
 NET=${4:-"1.0000 EOS"}
 CPU=${5:-"1.0000 EOS"}
 AIRDROP_TOKEN_CONTRACT=${6:-exampletoken}
-AIRDROP_TOKEN_TOTAL=${7:-'1000.0000 EX'}
-AIRDROP_TOKEN_LIMIT=${8:-'10.0000 EX'}
-CUSTODIAN_ACCOUNT=${9:-appcustodian}
+AIRDROP_TOKENS_PER_ACCOUNT=${7:-'1000.0000 EX'}
+CUSTODIAN_ACCOUNT=${8:-appcustodian}
 
 # app registration
 PARAMS_JSON='{"owner":"'$DAPP_OWNER'", "dapp":"'$DAPP'", "ram_bytes":"'$RAM_BYTES'", "net":"'$NET'", "cpu":"'$CPU'"}'
 cleos push action createbridge define "$PARAMS_JSON" -p $DAPP_OWNER
 
 cleos push action createbridge remdrop '["'$DAPP'", null]' -p $DAPP_OWNER
-AIRDROP_PARAMS_JSON='{"dapp":"'$DAPP'", "contract":"'$AIRDROP_TOKEN_CONTRACT'", "per_account":"'$AIRDROP_TOKEN_LIMIT'"}'
+AIRDROP_PARAMS_JSON='{"dapp":"'$DAPP'", "contract":"'$AIRDROP_TOKEN_CONTRACT'", "per_account":"'$AIRDROP_TOKENS_PER_ACCOUNT'"}'
 cleos push action createbridge regdrop "$AIRDROP_PARAMS_JSON" -p $DAPP_OWNER
 
 ## send the airdrop tokens to createbridge
-TRANSFER_JSON='{"from":"'$DAPP_OWNER'","to":"createbridge","quantity":"'$AIRDROP_TOKEN_TOTAL'","memo":"'$DAPP'"}'
+TRANSFER_JSON='{"from":"'$DAPP_OWNER'","to":"createbridge","quantity":"'$AIRDROP_TOKENS_PER_ACCOUNT'","memo":"'$DAPP'"}'
 cleos push action $AIRDROP_TOKEN_CONTRACT transfer "$TRANSFER_JSON" -p $DAPP_OWNER
 #
 ## whitelist other accounts

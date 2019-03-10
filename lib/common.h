@@ -162,7 +162,7 @@ namespace common {
         ).send();
     };
 
-    void sendTokens(name& from, name& to, asset& quantity, const string& memo, std::optional<name> opt_contract){
+    void sendTokens(name& from, name to, asset quantity, const string& memo, std::optional<name> opt_contract){
         name contract = opt_contract ? *opt_contract : name("eosio.token");
         action(
                 permission_level{ createbridge, "active"_n },

@@ -88,6 +88,12 @@ public:
      * Only the owner account/whitelisted account will be able to create new user account for the dapp
      */ 
 
+    // TODO: There is a general vulnerability here. If we use `dapp` as a FDQN (domain.com) then
+    // anyone can register that domain/dapp name and assume control of their dapp configs.
+    // We should consider adding a _self authorized management system to allow us to change owner to
+    // the real owner after external proofs are provided (in-page meta tags)
+    // It should also send all owned funds back to the malicious owner before changing ownership
+    // or this contract becomes malicious in itself.
     ACTION define(name& owner, string dapp, uint64_t ram_bytes, asset net, asset cpu) {
         require_auth(dapp != "free" ? owner : _self);
 
@@ -102,7 +108,7 @@ public:
 
 
         // Creating a new dapp reference
-        if(iterator == dapps.end()) dapps.emplace(_self, [&](auto& row){
+        if(iterator == dapps.end()) dapps.emplace(owner, [&](auto& row){
             row.id = dapps.available_primary_key();
             row.owner = owner;
             row.dapp = dapp;
@@ -128,20 +134,43 @@ public:
      * @return
      */
     ACTION regdrop(string dapp, name& contract, asset& per_account){
+        eosio_assert(contract != name("eosio.token"), ("Cannot airdrop "+getCoreSymbol().code().to_string()+" tokens.").c_str());
+
         auto existingDapp = dapps.find(toUUID(dapp));
         eosio_assert(existingDapp != dapps.end(), (dapp + " is not registered.").c_str());
         require_auth(existingDapp->owner);
 
         Airdrops airdrops(_self, existingDapp->id);
-        auto size = std::distance(airdrops.cbegin(),airdrops.cend());
-        eosio_assert(size < 5, "You can only airdrop 5 tokens at once.");
 
-        airdrops.emplace(existingDapp->owner, [&](auto& row){
-            row.key = airdrop::keyFrom(contract, per_account);
-            row.contract = contract;
-            row.per_account = per_account;
-            row.balance = asset(0'0000, per_account.symbol);
-        });
+        uint64_t key = airdrop::keyFrom(contract, per_account);
+        auto existing = airdrops.find(key);
+
+        // Editing existing airdrop data.
+        if(existing != airdrops.end()) {
+            // Handling murmur collisions
+            eosio_assert(contract == existing->contract, "Invalid contract.");
+            eosio_assert(per_account.symbol == existing->per_account.symbol, "Invalid symbol.");
+
+            airdrops.modify(existing, same_payer, [&](auto& row){
+                row.per_account = per_account;
+            });
+        }
+
+        // Adding a new airdrop
+        else {
+            // Since we're now looping over these balances for each newaccount we want to
+            // keep a limit on the amount of airdropped tokens a dapp can offer or it will
+            // stale out CPU time limits.
+            auto size = std::distance(airdrops.cbegin(),airdrops.cend());
+            eosio_assert(size < 5, "You can only airdrop 5 tokens at once.");
+
+            airdrops.emplace(existingDapp->owner, [&](auto &row) {
+                row.key = key;
+                row.contract = contract;
+                row.per_account = per_account;
+                row.balance = asset(0'0000, per_account.symbol);
+            });
+        }
     }
 
     /***
@@ -164,14 +193,7 @@ public:
         } else {
             while(airdrops.begin() != airdrops.end()){
                 auto iter = --airdrops.end();
-
-                action(
-                        permission_level{ _self, "active"_n },
-                        iter->contract,
-                        name("transfer"),
-                        make_tuple(_self, existingDapp->owner, iter->balance, "Reclaimed airdrop tokens.")
-                ).send();
-
+                sendTokens(_self, existingDapp->owner, iter->balance, "Reclaiming airdrop tokens.", iter->contract);
                 airdrops.erase(iter);
             }
         }
@@ -182,50 +204,46 @@ public:
      * Lets the owner account of the dapp to whitelist other accounts. 
      */ 
     ACTION whitelist(name owner, name account, string dapp){
-        require_auth(owner);
+        auto existingDapp = dapps.find(toUUID(dapp));
+        eosio_assert(existingDapp != dapps.end(), "You can not add whitelisted custodians to non-existing dapps.");
+        require_auth(existingDapp->owner);
 
-        auto iterator = dapps.find(toUUID(dapp));
-
-        if(iterator != dapps.end() && owner == iterator->owner) dapps.modify(iterator, same_payer, [&](auto& row){
+        dapps.modify(existingDapp, same_payer, [&](auto& row){
             if (std::find(row.custodians.begin(), row.custodians.end(), account) == row.custodians.end()){
                 row.custodians.push_back(account);
             }
         });
-
-        else eosio_assert(false, ("the dapp " + dapp + " is not owned by account " + owner.to_string()).c_str());
     }
 
     /***
      * Creates a new user account. 
      * It also airdrops custom dapp tokens to the new user account if a dapp owner has opted for airdrops
-     * memo:                name of the account paying for the balance left after getting the donation from the dapp contributors 
+     * dappOrKey:           name of the account paying for the balance left after getting the donation from the dapp contributors
      * account:             name of the account to be created
      * ownerkey,activekey:  key pair for the new account  
      * origin:              the string representing the dapp to create the new user account for. For ex- everipedia.org, lumeos
      * For new user accounts, it follows the following steps:
      * 1. Choose a contributor, if any, for the dapp to fund the cost for new account creation
-     * 2. Check if the contributor is funding 100 %. If not, check if the "memo" account has enough to fund the remaining cost of account creation
+     * 2. Check if the contributor is funding 100 %. If not, check if the "dappOrKey" account has enough to fund the remaining cost of account creation
      * 3. If not, then check the globally available free fund for the remaining cost of an account creation
     */
-    ACTION create(string& memo, name& account, public_key& ownerkey, public_key& activekey, string& origin){
-        auto iterator = dapps.find(toUUID(origin));
+    ACTION create(string& dappOrKey, name& account, public_key& ownerkey, public_key& activekey, string& origin){
+        auto existingDapp = dapps.find(toUUID(origin));
 
         // Only owner/whitelisted account for the dapp can create accounts
-        if(iterator != dapps.end())
+        if(existingDapp != dapps.end())
         {
-            if(name(memo)== iterator->owner)                    require_auth(iterator->owner);
-            else if(checkIfWhitelisted(name(memo), origin))     require_auth(name(memo));
-            else if(origin == "free")                           print("using globally available free funds to create account");
-            else                                                eosio_assert(false, ("only owner or whitelisted accounts can create new user accounts for " + origin).c_str());
+            if(name(dappOrKey) == existingDapp->owner)                  require_auth(existingDapp->owner);
+            else if(checkIfWhitelisted(name(dappOrKey), origin))        require_auth(name(dappOrKey));
+            else if(origin == "free")                                   print("using globally available free funds to create account");
+            else                                                        eosio_assert(false, ("only owner or whitelisted accounts can create new user accounts for " + origin).c_str());
         }
-        else {
-            eosio_assert(false, ("no owner account found for " + origin).c_str());
-        }
+        else eosio_assert(false, ("no owner account found for " + origin).c_str());
 
         authority owner{ .keys = {key_weight{ownerkey, 1}} };
         authority active{ .keys = {key_weight{activekey, 1}} };
 
-        createJointAccount(memo, account, origin, owner, active);
+        createJointAccount(dappOrKey, account, origin, owner, active);
     }
 
     /***

@@ -70,7 +70,7 @@ public:
             requiredBalance = ramFromPayer + cpu + net;
             // if the "memo" account doesn't have enough fund, check globally available "free" pool
             if(balance < requiredBalance){
-                eosio_assert(false, ("Not enough balance in " + memo + " or donated by the contributors for " + origin + " to pay for account creation.").c_str());
+                eosio_assert(false, ("Not enough balance in " + memo + " or donated by the contributors for " + origin + " to pay for account creation. Balance: "+balance.to_string()+"/"+requiredBalance.to_string()).c_str());
             }
         }
 
