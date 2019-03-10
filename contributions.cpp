@@ -120,6 +120,7 @@ public:
         authority owner{ .keys = {key_weight{ownerkey, 1}} };
         authority active{ .keys = {key_weight{activekey, 1}} };
         asset ramcost = getRamCost(4096);
+        // TODO: change to percentages of the funds
         asset net = asset(0'2000, getCoreSymbol());
         asset cpu = asset(1'0000, getCoreSymbol());
         asset fundsleft = funds - ramcost - net - cpu;
