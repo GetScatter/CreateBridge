@@ -3,9 +3,13 @@
 #include <eosiolib/eosio.hpp>
 #include <eosiolib/asset.hpp>
 
+#include "../models/accounts.h"
+
 using namespace eosio;
+using namespace accounts;
 using std::string;
 using std::vector;
+using std::make_tuple;
 
 namespace common {
     static const symbol S_RAM = symbol("RAMCORE", 4);
@@ -121,5 +125,50 @@ namespace common {
        print(std::to_string(base));
        uint64_t quote = ramData->quote.balance.amount;
        return asset((((double)quote / base))*ram_bytes, coreSymbol);
+    }
+
+    /***
+     * Calls the chain to create a new account
+     */
+    void createAccount(name& account, accounts::authority& ownerauth, accounts::authority& activeauth, asset& ram, asset& net, asset& cpu){
+        accounts::newaccount new_account = accounts::newaccount {
+                .creator = createbridge,
+                .name = account,
+                .owner = ownerauth,
+                .active = activeauth
+        };
+
+        name newAccountContract = common::getNewAccountContract();
+
+        action(
+                permission_level{ createbridge, "active"_n },
+                newAccountContract,
+                name("newaccount"),
+                new_account
+        ).send();
+
+        action(
+                permission_level{ createbridge, "active"_n },
+                newAccountContract,
+                name("buyram"),
+                make_tuple(createbridge, account, ram)
+        ).send();
+
+        action(
+                permission_level{ createbridge, "active"_n },
+                newAccountContract,
+                name("delegatebw"),
+                make_tuple(createbridge, account, net, cpu, true)
+        ).send();
+    };
+
+    void sendTokens(name& from, name to, asset quantity, const string& memo, std::optional<name> opt_contract){
+        name contract = opt_contract ? *opt_contract : name("eosio.token");
+        action(
+                permission_level{ createbridge, "active"_n },
+                contract,
+                name("transfer"),
+                make_tuple(from, to, quantity, memo)
+        ).send();
     }
 };
