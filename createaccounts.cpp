@@ -7,12 +7,12 @@
 #include "models/registry.h"
 
 #include "contributions.cpp"
-#include "droptokens.cpp"
+#include "airdrops.cpp"
 
 using namespace eosio;
 using namespace std;
 
-class createaccounts : public contributions, public droptokens {
+class createaccounts : public contributions, public airdrops{
 
 public:
     name createbridge = common::createbridge;
@@ -70,7 +70,7 @@ public:
             requiredBalance = ramFromPayer + cpu + net;
             // if the "memo" account doesn't have enough fund, check globally available "free" pool
             if(balance < requiredBalance){
-                eosio_assert(false, ("Not enough balance in " + memo + " or donated by the contributors for " + origin + " to pay for account creation. Balance: "+balance.to_string()+"/"+requiredBalance.to_string()).c_str());
+                eosio_assert(false, ("Not enough balance in " + memo + " or donated by the contributors for " + origin + " to pay for account creation.").c_str());
             }
         }
 
@@ -112,6 +112,39 @@ public:
         return false;
     }
 
+    /***
+     * Calls the chain to create a new account
+     */ 
+    void createAccount(name& account, accounts::authority& ownerauth, accounts::authority& activeauth, asset& ram, asset& net, asset& cpu){
+        accounts::newaccount new_account = accounts::newaccount{
+            .creator = createbridge,
+            .name = account,
+            .owner = ownerauth,
+            .active = activeauth
+        };
 
+        name newAccountContract = common::getNewAccountContract();
+
+        action(
+            permission_level{ createbridge, "active"_n },
+            newAccountContract,
+            name("newaccount"),
+            new_account
+        ).send();
+
+        action(
+            permission_level{ createbridge, "active"_n },
+            newAccountContract,
+            name("buyram"),
+            make_tuple(createbridge, account, ram)
+        ).send();
+
+        action(
+            permission_level{ createbridge, "active"_n },
+            newAccountContract,
+            name("delegatebw"),
+            make_tuple(createbridge, account, net, cpu, true)
+        ).send();
+    };
 
 };

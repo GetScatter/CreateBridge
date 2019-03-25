@@ -1,7 +1,6 @@
 #include <eosiolib/eosio.hpp>
 #include <eosiolib/print.hpp>
 #include <eosiolib/action.hpp>
-#include <eosiolib/transaction.hpp>
 #include <eosiolib/crypto.h>
 #include <algorithm> 
 #include <cstdlib>
@@ -40,96 +39,41 @@ public:
 
     /*
      * Adds the amount contributed by the contributor for an app to the balances table
-     * Called by the internal transfer function
-     *
-     * Params:
-     * 0 - Dapp OR public key
-     * 1 - RAM
-     * 2 - Total Accounts
-     * 3 - account name
-     * 4 - active key (optional)
+     * Called by the internal transfer function 
      */
     void addBalance(const name& from, const asset& quantity, string& memo){
 
-        vector<string> params = common::split(memo, ",");
+        vector<string> stats = common::split(memo, ",");
+        uint64_t id = common::toUUID(stats[0]);
 
-        // Creating a self funded account
-        if(params.size() == 2){
-            public_key key = getPublicKey(params[0]);
-            name account = name(params[1]);
-            eosio_assert( !is_account( account ), ("There is already an account on this network with the name "+account.to_string()).c_str());
-            selfFundAccount(account, key, key, quantity);
-        }
+        int ram = stats[0] == "free" ? 100 : stoi(stats[1]);
+        int totalaccounts = stats.size() == 3 ? stoi(stats[2]) : -1;
 
-        // Adding contributions to the dapp's balances.
-        else {
-            string dapp = params[0];
-            uint64_t id = common::toUUID(dapp);
-            int ram = dapp == "free" ? 100 : stoi(params[1]);
-            int totalaccounts = params.size() == 3 ? stoi(params[2]) : 0;
+        balances::Balances balances(createbridge, createbridge.value);
+        auto iterator = balances.find(id);
+        if(iterator == balances.end()) balances.emplace(createbridge, [&](auto& row){
+            row.memo = id;
+            row.contributors.push_back({from, quantity, ram, totalaccounts, 0});
+            row.balance = quantity;
+            row.origin = stats[0];
+            row.timestamp = now();
 
-            // TODO: Validate that a dapp exists before accepting tokens in its name.
-            registry::Registry registry(createbridge, createbridge.value);
-
-
-            balances::Balances balances(createbridge, createbridge.value);
-            auto iterator = balances.find(id);
-            // TODO: This will lead to RAM exploits by having users add many 0.0001 EOS
-            // balances which will cost more in RAM than quantities sent in EOS.
-            // - Solution 1-A: Have the dapp open up a row for this (see TODO below for further gotchas)
-            // - Solution 1-B: Same as solution 1-A but have the dapp also populate up to 10 dummy rows which can then be
-            //                 changed to have users assume those rows without spending RAM costs. Will need a minimum set
-            //                 by the "define" action so that users don't assume all rows with low balances.
-            // - Solution 2: Require a minimum EOS transfer balance here which will always be above RAM cost,
-            // and also take a small FEE to keep flowing more RAM into the contract.
-            if(iterator == balances.end()) balances.emplace(createbridge, [&](auto& row){
-                row.memo = id;
+        });
+        else balances.modify(iterator, same_payer, [&](auto& row){
+            auto pred = [from](const balances::contributors & item) {
+                return item.contributor == from;
+            };
+            std::vector<balances::contributors>::iterator itr = std::find_if(std::begin(row.contributors), std::end(row.contributors), pred);    
+            if(itr != std::end(row.contributors)){
+                itr->balance += quantity;
+                itr->ram = ram;
+                itr->totalaccounts = totalaccounts;
+            } else {
                 row.contributors.push_back({from, quantity, ram, totalaccounts, 0});
-                row.balance = quantity;
-                row.origin = dapp;
                 row.timestamp = now();
-            });
-            else balances.modify(iterator, same_payer, [&](auto& row){
-                auto pred = [from](const balances::contributors & item) { return item.contributor == from; };
-                std::vector<balances::contributors>::iterator itr = std::find_if(std::begin(row.contributors), std::end(row.contributors), pred);
-                if(itr != std::end(row.contributors)){
-                    itr->balance += quantity;
-                    itr->ram = ram;
-                    itr->totalaccounts = totalaccounts;
-                } else {
-                    // TODO: Because of the changes needed to mitigate the RAM exploit (solution 1-A), this will no longer
-                    // work as expansion of the RAM will be denied by EOSIO since it is no longer owned by the contract.
-                    row.contributors.push_back({from, quantity, ram, totalaccounts, 0});
-                    row.timestamp = now();
-                }
-                row.balance += quantity;
-            });
-        }
-    }
-
-    /***
-     * Self funding an account instead of using the broader system.
-     * Because no dapp is specified here no airdrops or joint creation benefits are
-     * used. This is simply a quick and easy way to fund accounts via transfers.
-     * @param account
-     * @param owner
-     * @param active
-     * @param funds
-     */
-    void selfFundAccount(name& account, public_key& ownerkey, public_key& activekey, asset funds){
-        authority owner{ .keys = {key_weight{ownerkey, 1}} };
-        authority active{ .keys = {key_weight{activekey, 1}} };
-        asset ramcost = getRamCost(4096);
-        // TODO: change to percentages of the funds
-        asset net = asset(0'2000, getCoreSymbol());
-        asset cpu = asset(1'0000, getCoreSymbol());
-        asset fundsleft = funds - ramcost - net - cpu;
-        eosio_assert(fundsleft.amount >= 0, ("You need to send at least "+(ramcost + net + cpu).to_string()+" to createbridge for this account.").c_str());
-
-        createAccount(account, owner, active, ramcost, net, cpu);
-        if(fundsleft.amount > 0) {
-            sendTokens(createbridge, account, fundsleft, "Thanks for using CreateBridge!", name("eosio.token"));
-        }
+            }
+            row.balance += quantity;
+        });
     }
 
     /*
