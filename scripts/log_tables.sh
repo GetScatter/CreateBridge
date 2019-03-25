@@ -23,9 +23,4 @@ echo "Token"
 cleos get table createbridge createbridge token
 echo ""
 echo ""
-
-echo "Airdrops"
-cleos get table createbridge 0 airdrops
-echo ""
-echo ""
 echo "-------------------"
