@@ -40,9 +40,9 @@ You can also specify the RAM in bytes, the amount of EOS for NET and CPU (in tha
 Also, if you wish to airdrop dapp tokens to the newly created account specify the airdrop contract, total airdrop supply
 and the amount to airdrop to every new user account created. 
 ```
-cleos push action createbridge define '[YOUR_ACCOUNT,dapp_name,ram,net,cpu,airdrop_contract,airdrop_tokens,airdrop_limit]'
+cleos push action createbridge define '[YOUR_ACCOUNT,dapp_name,ram_bytes,net,cpu,[airdrop_contract,airdrop_tokens,airdrop_limit]]'
 
-cleos push action createbridge define '["mydappowner1","mydapp.org","1.0000 EOS","1.0000 EOS","1.0000 EOS","mydapptoken1","1000000.0000 DP","10.0000 DP"]'
+cleos push action createbridge define '["mydappowner1","mydapp.org","1.0000 EOS","1.0000 EOS","1.0000 EOS",["mydapptoken1","1000000.0000 DP","10.0000 DP"]]'
 ```
 ### Fund createbridge
 
